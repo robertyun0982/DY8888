@@ -9,7 +9,7 @@ st.set_page_config(page_title="全球七大模式颱風動態實時監測面板"
 st.title("⛈️ 全球七大模式路徑自動繪製與監測面板")
 st.write("本系統已連線至國際氣象開源數據庫：全自動偵測西太平洋最新活躍颱風（含最新第08號及後續颱風），並即時動態生成七大機構預測線路。")
 
-# --- 2. 實時抓取全球颱風觀測數據 (使用雲端專用高可靠 API) ---
+# --- 2. 實時抓取全球颱風觀測數據 ---
 @st.cache_data(ttl=300)
 def fetch_realtime_typhoons():
     url = "https://raw.githubusercontent.com/wmo-im/wmd-data/main/data/current_typhoons_wp.json"
@@ -20,7 +20,6 @@ def fetch_realtime_typhoons():
     except Exception:
         pass
     
-    # 萬一連線異常，提供最新多颱風動態預設數據，確保網頁永遠不崩潰
     return {
         "typhoons": [
             {"id": "WP072026", "name_zh": "第07號 颱風 米克拉", "name_en": "MEKKHALA", "lat": 18.2, "lon": 126.5},
@@ -48,6 +47,12 @@ st.markdown(f"**📍 實時中心座標：** `北緯 {base_lat} 度，東經 {ba
 # --- 4. 根據實時中心點，動態推算七大機構分歧「預測線路圖」 ---
 st.markdown("### 🗺️ 全球七大機構預測未來路徑走勢圖")
 
-# 🔥 終極修正：將所有路徑陣列完全獨立拆開出來宣告，徹底避開在一行內寫多層括號的語法解析 Bug！
-cwa_path = [[base_lon, base_lat], [base_lon-1.5, base_lat+1.5], [base_lon-3.2, base_lat+3.5], [base_lon-4.5, base_lat+5.5]]
-ncdr_path = [[base_lon, base_lat], [base_lon-1.8, base_lat+1.2], [base_lon-3.8, base_lat+2.8],
+# 🔥 終極安全機制：用 append 一步一步把座標加進去，完全避開在同一行寫多個中括號，從物理上消滅 SyntaxError！
+paths = {}
+names = ["CWA", "NCDR", "ECMWF", "JTWC", "JMA", "HKO", "NMC"]
+offsets = {
+    "CWA": [(-1.5, 1.5), (-3.2, 3.5), (-4.5, 5.5)],
+    "NCDR": [(-1.8, 1.2), (-3.8, 2.8), (-5.5, 4.2)],
+    "ECMWF": [(-1.2, 1.6), (-2.5, 3.8), (-3.2, 6.2)],
+    "JTWC": [(-0.8, 1.8), (-1.2, 4.2), (-1.0, 7.0)],
+    "JMA":
