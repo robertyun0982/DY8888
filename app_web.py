@@ -77,4 +77,45 @@ with right_col:
     else:
         # 8 號颱風（原樣參考線）
         cwa = [[base_lon, base_lat], [base_lon-0.6, base_lat+0.5], [base_lon-1.2, base_lat+1.1], [base_lon-1.8, base_lat+1.7], [base_lon-2.5, base_lat+2.3], [base_lon-3.2, base_lat+3.0], [base_lon-4.0, base_lat+3.7], [base_lon-4.7, base_lat+4.4], [121.8, 23.5], [121.0, 24.2], [119.5, 25.0]]
-        ncdr = [[base_lon, base_lat], [base_lon-0.7, base_lat+0.4],
+        ncdr = [[base_lon, base_lat], [base_lon-0.7, base_lat+0.4], [base_lon-1.4, base_lat+0.9], [base_lon-2.2, base_lat+1.5], [base_lon-3.0, base_lat+2.1], [base_lon-3.8, base_lat+2.7], [base_lon-4.6, base_lat+3.4], [base_lon-5.3, base_lat+4.1], [121.3, 22.8], [120.5, 23.6], [119.0, 24.5]]
+        ecmwf = [[base_lon, base_lat], [base_lon-0.4, base_lat+0.5], [base_lon-0.9, base_lat+1.1], [base_lon-1.4, base_lat+1.8], [base_lon-1.9, base_lat+2.6], [base_lon-2.4, base_lat+3.4], [base_lon-2.9, base_lat+4.3], [base_lon-3.3, base_lat+5.2], [123.2, 24.0], [122.5, 25.2], [122.0, 26.5]]
+        jtwc = [[base_lon, base_lat], [base_lon-0.2, base_lat+0.6], [base_lon-0.4, base_lat+1.3], [base_lon-0.6, base_lat+2.1], [base_lon-0.8, base_lat+3.0], [base_lon-0.9, base_lat+4.0], [base_lon-1.0, base_lat+5.0], [base_lon-0.9, base_lat+6.0], [124.5, 24.5], [124.0, 25.8], [123.8, 27.2]]
+        jma = [[base_lon, base_lat], [base_lon-0.5, base_lat+0.4], [base_lon-1.1, base_lat+1.0], [base_lon-1.8, base_lat+1.6], [base_lon-2.6, base_lat+2.3], [base_lon-3.3, base_lat+3.0], [base_lon-4.0, base_lat+3.8], [base_lon-4.6, base_lat+4.6], [122.0, 23.8], [121.3, 25.0], [120.5, 26.2]]
+        hko = [[base_lon, base_lat], [base_lon-0.5, base_lat+0.4], [base_lon-1.2, base_lat+0.9], [base_lon-2.0, base_lat+1.5], [base_lon-2.8, base_lat+2.2], [base_lon-3.6, base_lat+2.9], [base_lon-4.4, base_lat+3.6], [base_lon-5.1, base_lat+4.4], [121.6, 23.2], [121.0, 24.5], [120.0, 25.8]]
+        nmc = [[base_lon, base_lat], [base_lon-0.4, base_lat+0.5], [base_lon-1.0, base_lat+1.1], [base_lon-1.6, base_lat+1.7], [base_lon-2.2, base_lat+2.4], [base_lon-2.8, base_lat+3.2], [base_lon-3.4, base_lat+4.0], [base_lon-3.9, base_lat+4.9], [122.8, 24.2], [122.2, 25.5], [121.7, 26.8]]
+
+    lines_data = [
+        {"name": "CWA (黃)", "color": [255, 192, 0], "path": cwa},
+        {"name": "NCDR (藍)", "color": [0, 102, 204], "path": ncdr},
+        {"name": "ECMWF (青)", "color": [0, 204, 204], "path": ecmwf},
+        {"name": "JTWC (橘)", "color": [255, 102, 0], "path": jtwc},
+        {"name": "JMA (粉紅)", "color": [204, 0, 204], "path": jma},
+        {"name": "HKO (綠)", "color": [0, 153, 76], "path": hko},
+        {"name": "NMC (紅)", "color": [204, 0, 0], "path": nmc}
+    ]
+    
+    poi_data = [{"label": "🇹🇼 台灣本島", "lon": 120.9, "lat": 23.7}]
+    df_poi = pd.DataFrame(poi_data)
+    df_lines = pd.DataFrame(lines_data)
+    
+    # 重新調整中心視角，完美鎖定宮古島、沖繩與台灣東部海域
+    view_state = pdk.ViewState(latitude=24.5, longitude=124.5, zoom=4.2, pitch=0)
+    
+    line_layer = pdk.Layer(
+        "PathLayer", df_lines, get_path="path", get_color="color",
+        width_scale=5, width_min_pixels=1, get_width=2, pickable=True
+    )
+    
+    poi_text_layer = pdk.Layer(
+        "TextLayer", df_poi, get_position=["lon", "lat"], get_text="label",
+        get_color=[255, 255, 255], get_size=14, background_color=[0, 0, 0, 160]
+    )
+    
+    st.pydeck_chart(pdk.Deck(
+        map_style="road", initial_view_state=view_state, 
+        layers=[line_layer, poi_text_layer], tooltip={"text": "{name}"}
+    ), use_container_width=True)
+    
+    # Windy 雷達同步顯示真實中心點
+    windy_iframe_url = f"https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricWind=default&zoom=4&overlay=wind&product=ecmwf&level=surface&lat={base_lat}&lon={base_lon}"
+    st.components.v1.iframe(windy_iframe_url, width=None, height=320, scrolling=False)
