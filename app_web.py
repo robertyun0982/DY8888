@@ -8,16 +8,29 @@ st.set_page_config(page_title="全球七大模式監測", page_icon="🌪️", l
 # 強力縮減空白與優化容器結構
 st.markdown("""
     <style>
-        /* 縮小上方空白與內邊距 */
-        .block-container {padding-top: 1.5rem !important; padding-bottom: 0px !important; max-width: 1200px !important; margin: 0 auto;}
+        /* 🔓 關鍵修正：將 padding-top 從 1.5rem 放寬到 3.5rem，留出上方安全空間，防止標題被吃掉 */
+        .block-container {
+            padding-top: 3.5rem !important; 
+            padding-bottom: 0px !important; 
+            max-width: 1200px !important; 
+            margin: 0 auto;
+        }
         div.stMetric {padding-top: 0px !important; padding-bottom: 0px !important;}
         iframe {margin-bottom: 0px !important; border-radius: 8px;}
         /* 限制地圖容器的排版 */
         .stPydeckChart {height: 340px !important; border-radius: 8px; overflow: hidden;}
+        
+        /* 標題專用美化：加上下適當間距，確保字體完美顯現 */
+        .main-title {
+            margin-top: 5px !important;
+            margin-bottom: 20px !important;
+            font-weight: bold;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("### 🌪️ 全球七大模式 5 天路徑實時動態監測")
+# 使用專用 class 確保標題往下移、不被吃掉
+st.markdown("<h3 class='main-title'>🌪️ 全球七大模式 5 天路徑實時動態監測</h3>", unsafe_allow_html=True)
 
 # --- 2. 核心數據庫 ---
 typhoon_list = [
@@ -74,7 +87,7 @@ with right_col:
         nmc = [[124.7, 19.1], [124.4, 20.2], [124.2, 21.3], [124.0, 22.5], [124.0, 23.8], [124.2, 25.0], [124.7, 26.2], [125.5, 27.3], [126.6, 28.3], [128.0, 29.2], [129.6, 30.1]]
         map_lat, map_lon, map_zoom = 24.5, 124.5, 4.0
     else:
-        # 8號無花果路徑（關島北上）
+        # 8號無花果路徑（依據最新新聞修正：關島出發西北西轉北去日本）
         cwa = [[145.5, 15.2], [142.5, 16.1], [139.5, 17.2], [137.0, 18.5], [135.5, 20.5], [135.0, 23.0], [135.2, 25.5], [136.0, 28.0], [137.2, 30.5], [139.0, 32.5], [141.5, 34.2]]
         ncdr = [[145.5, 15.2], [142.7, 16.0], [139.8, 17.0], [137.2, 18.2], [135.8, 20.0], [135.1, 22.5], [135.0, 25.0], [135.5, 27.5], [136.5, 29.8], [138.0, 31.8], [140.2, 33.5]]
         ecmwf = [[145.5, 15.2], [142.3, 16.3], [139.2, 17.5], [136.5, 19.0], [134.8, 21.2], [134.2, 23.8], [134.5, 26.5], [135.5, 29.0], [137.0, 31.5], [139.2, 33.5], [142.0, 35.0]]
@@ -94,7 +107,6 @@ with right_col:
         {"name": "NMC (紅)", "color": [204, 0, 0], "path": nmc}
     ]
     
-    # 在底圖可能失效的情況下，增加顯眼的圓點標記(ScatterplotLayer)作為視覺加強保障，防阻迷路
     poi_data = [
         {"label": "台灣本島", "lon": 120.9, "lat": 23.7, "size": 30000, "color": [0, 128, 255]},
         {"label": f"中央氣象署命名：{current_ty['name_cwa']}", "lon": base_lon, "lat": base_lat, "size": 50000, "color": [255, 50, 50]}
@@ -110,7 +122,6 @@ with right_col:
         width_scale=5, width_min_pixels=2, get_width=3, pickable=True
     )
     
-    # 🔴 加強保險層：在地圖底圖不載入時，發光的定位點依然能正常顯示在畫面上！
     scatter_layer = pdk.Layer(
         "ScatterplotLayer", df_poi, get_position=["lon", "lat"],
         get_radius="size", get_fill_color="color", pickable=True
@@ -122,7 +133,6 @@ with right_col:
         get_alignment_baseline="'bottom'"
     )
     
-    # 🌟 關鍵修正：將 map_style 改為 None (使用 Streamlit 原生底圖) 或使用默認樣式，徹底避免第三方安全域名阻擋導致的地圖空白
     st.pydeck_chart(pdk.Deck(
         map_style=None, 
         initial_view_state=view_state, 
@@ -130,6 +140,6 @@ with right_col:
         tooltip={"text": "{name}{label}"}
     ), use_container_width=True)
     
-    # ⚡ 縮小網頁畫面佔用：將 Windy 雷達高度從 320 縮減至精簡的 250，更適合網頁開啟
+    # Windy 雷達組件高度 250
     windy_iframe_url = f"https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricWind=default&zoom=3&overlay=wind&product=ecmwf&level=surface&lat={base_lat}&lon={base_lon}"
     st.components.v1.iframe(windy_iframe_url, width=None, height=250, scrolling=False)
