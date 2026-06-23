@@ -67,4 +67,4 @@ with right_col:
         "歐洲 ECMWF (青)": [base_lat, base_lat+1.6, base_lat+3.8, base_lat+6.2],
         "美國 JTWC (橘)": [base_lat, base_lat+1.8, base_lat+4.2, base_lat+7.0],
         "日本 JMA (粉)": [base_lat, base_lat+1.4, base_lat+3.3, base_lat+5.0],
-        "香港 HKO (綠)":
+        "香港 HKO (綠)":})
