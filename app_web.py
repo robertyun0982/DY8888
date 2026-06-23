@@ -48,44 +48,5 @@ st.markdown(f"**📍 實時中心座標：** `北緯 {base_lat} 度，東經 {ba
 # --- 4. 根據實時中心點，動態推算七大機構分歧「預測線路圖」 ---
 st.markdown("### 🗺️ 全球七大機構預測未來路徑走勢圖")
 
-# 🔥 終極修正：改用乾淨的單行 Dict 宣告，徹底免疫括號未閉合的 SyntaxError 語法錯誤！
 lines_data = [
-    {"name": "中央氣象局 CWA 線路 (黃)", "color": [255, 255, 0], "path": [[base_lon, base_lat], [base_lon-1.5, base_lat+1.5], [base_lon-3.2, base_lat+3.5], [base_lon-4.5, base_lat+5.5]]},
-    {"name": "台灣 NCDR 線路 (藍)", "color": [0, 128, 255], "path": [[base_lon, base_lat], [base_lon-1.8, base_lat+1.2], [base_lon-3.8, base_lat+2.8], [base_lon-5.5, base_lat+4.2]]},
-    {"name": "歐洲 ECMWF 線路 (青)", "color": [0, 255, 255], "path": [[base_lon, base_lat], [base_lon-1.2, base_lat+1.6], [base_lon-2.5, base_lat+3.8], [base_lon-3.2, base_lat+6.2]]},
-    {"name": "美國 JTWC 線路 (橘)", "color": [255, 128, 0], "path": [[base_lon, base_lat], [base_lon-0.8, base_lat+1.8], [base_lon-1.2, base_lat+4.2], [base_lon-1.0, base_lat+7.0]]},
-    {"name": "日本 JMA 線路 (粉紅)", "color": [255, 0, 255], "path": [[base_lon, base_lat], [base_lon-1.6, base_lat+1.4], [base_lon-3.4, base_lat+3.3], [base_lon-4.8, base_lat+5.0]]},
-    {"name": "香港 HKO 線路 (綠)", "color": [0, 200, 0], "path": [[base_lon, base_lat], [base_lon-1.7, base_lat+1.3], [base_lon-3.6, base_lat+3.0], [base_lon-5.2, base_lat+4.6]]},
-    {"name": "中國 NMC 線路 (紅)", "color": [255, 0, 0], "path": [[base_lon, base_lat], [base_lon-1.4, base_lat+1.6], [base_lon-3.0, base_lat+3.6], [base_lon-4.0, base_lat+5.8]]}
-]
-
-df_lines = pd.DataFrame(lines_data)
-
-# 將地圖中心點自動定錨在當前颱風的位置
-view_state = pdk.ViewState(latitude=base_lat+3.0, longitude=base_lon-2.0, zoom=4.5, pitch=0)
-
-line_layer = pdk.Layer(
-    "PathLayer",
-    df_lines,
-    get_path="path",
-    get_color="color",
-    width_scale=20,
-    width_min_pixels=3,
-    get_width=6,
-    pickable=True
-)
-
-st.pydeck_chart(pdk.Deck(
-    map_style="dark", 
-    initial_view_state=view_state,
-    layers=[line_layer],
-    tooltip={"text": "{name}"}
-))
-st.caption("💡 說明：地圖已鎖定上述颱風。7條彩色線路為各機構動態預測軌跡，滑鼠移至線路上可看機構名稱。")
-
-# --- 5. UI 介面：真實七國數據條列式報告 ---
-st.markdown("### 📋 七大機構最新預估侵台機率")
-
-dist_factor = 1.0 if base_lon < 130 else 0.5
-probs = {
-    "CWA": round(38.5 * dist_factor, 1), "NCDR
+    {"name": "中央氣象局 CWA 線路 (黃)", "color": [255, 255, 0], "path": [[base_lon, base_lat],
