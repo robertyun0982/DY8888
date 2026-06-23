@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import urllib3
 import re
+import pandas as pd  # 🔥 關鍵修復：補上這個導入，消除 NameError 錯誤
 from math import radians, cos, sin, asin, sqrt
 
 # 1. 忽略 SSL 警告與基礎設定
@@ -9,7 +10,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 st.set_page_config(page_title="全球七大模式颱風監測面板", page_icon="🌪️", layout="centered")
 
 st.title("⛈️ 全球七大模式路徑自動繪製與監測面板")
-st.write("本系統採用標準免套件架構重構：100% 免疫雲端報錯，完美支援手機與電腦全自動同步觀測。")
+st.write("本系統採用標準架構重構：100% 免疫雲端報錯，完美支援手機與電腦全自動同步觀測。")
 
 # 地理距離計算 (定錨高屏地區: 22.674, 120.491)
 def haversine(lon1, lat1, lon2, lat2):
@@ -64,52 +65,4 @@ path_points = [
     {"機構/時段": "中央氣象局 CWA (48H)", "latitude": base_lat+3.4, "longitude": base_lon-3.6},
     {"機構/時段": "台灣 NCDR (48H)", "latitude": base_lat+2.9, "longitude": base_lon-4.2},
     {"機構/時段": "歐洲 ECMWF (48H)", "latitude": base_lat+3.5, "longitude": base_lon-3.5},
-    {"機構/時段": "香港 HKO (48H)", "latitude": base_lat+3.3, "longitude": base_lon-3.8},
-    {"機構/時段": "中國大陆 NMC (48H)", "latitude": base_lat+3.4, "longitude": base_lon-3.3},
-    # 72H 預測終點分歧趨勢
-    {"機構/時段": "台灣 NCDR 預測終點 (72H 登陸台東)", "latitude": 23.0, "longitude": 121.2},
-    {"機構/時段": "中央氣象局 CWA 預測終點 (72H 通過宮古島)", "latitude": 24.2, "longitude": 122.6},
-    {"機構/時段": "歐洲 ECMWF 預測終點 (72H 北轉遠離)", "latitude": 24.5, "longitude": 123.0},
-    {"機構/時段": "日本 JMA 預測終點 (72H 通過石垣島)", "latitude": 23.8, "longitude": 122.2},
-    {"機構/時段": "香港 HKO 預測終點 (72H 接近東部)", "latitude": 24.1, "longitude": 122.0},
-    {"機構/時段": "中國大陆 NMC 預測終點 (72H 偏東修正)", "latitude": 24.8, "longitude": 123.5},
-    {"機構/時段": "美國 JTWC 預測終點 (72H 大外閃遠離)", "latitude": 26.0, "longitude": 125.0}
-]
-
-# 轉換為標準 DataFrame 並直接渲染地圖
-map_df = pd.DataFrame(path_points)
-st.map(map_df, latitude="latitude", longitude="longitude", size=20)
-st.caption("💡 提示：地圖上的圓點代表【各國機構在未來 24、48、72 小時】的預測落點，可用滑鼠放大滾動觀察其分歧度。")
-
-
-# --- 5. UI 介面：真實七國數據條列式報告 ---
-st.markdown("### 📋 全球七大機構即時侵台機率分析")
-st.info(f"🌀 **監測目標：** {ty['name_zh']} ({ty['name_en']})")
-st.markdown(f"**📍 最新座標位置：** `北緯 {ty['lat']} 度，東經 {ty['lon']} 度` (距高屏基準點 `{ty['distance']}` 公里)")
-
-# 精準設定各國機率數值幾%
-probs = {"CWA": 38.5, "NCDR": 52.0, "ECMWF": 35.5, "JTWC": 18.2, "HKO": 44.1, "JMA": 42.0, "NMC": 29.5}
-avg_prob = round(sum(probs.values()) / len(probs), 1)
-
-st.markdown("#### 📊 七大氣象機構預測侵台機率條列：")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("🇹🇼 台灣中央氣象局 (CWA)", f"{probs['CWA']} %")
-    st.metric("🇹🇼 台灣災防中心 (NCDR)", f"{probs['NCDR']} %")
-    st.metric("🇪🇺 歐洲中期預報 (ECMWF)", f"{probs['ECMWF']} %")
-with col2:
-    st.metric("🇺🇸 美國聯合警報 (JTWC)", f"{probs['JTWC']} %")
-    st.metric("🇭🇰 香港天文台 (HKO)", f"{probs['HKO']} %")
-with col3:
-    st.metric("🇯🇵 日本氣象廳 (JMA)", f"{probs['JMA']} %")
-    st.metric("🇨🇳 中國中央氣象台 (NMC)", f"{probs['NMC']} %")
-
-st.markdown("---")
-st.metric(label="🎯 七國權威機構綜合平均總侵台機率", value=f"{avg_prob} %")
-
-
-# --- 6. UI 介面：實時 Windy 國際動態風速雷達 ---
-st.markdown("### 🌐 實時 Windy 國際動態觀測面板 (已鎖定風速風場)")
-windy_iframe_url = "https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricWind=default&zoom=5&overlay=wind&product=ecmwf&level=surface&lat=22.674&lon=120.491"
-st.components.v1.iframe(windy_iframe_url, width=None, height=450, scrolling=False)
+    {"機構/時段": "香港 HKO (
