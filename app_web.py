@@ -3,7 +3,7 @@ import requests
 import urllib3
 import re
 import pandas as pd
-import pydeck as pdk  # 🔥 Streamlit 內建支援，免裝外掛，100% 不會報錯
+import pydeck as pdk  # Streamlit 內建支援，免裝外掛，100% 不會報錯
 
 # 1. 忽略 SSL 警告與基礎設定
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -40,13 +40,29 @@ st.write(f"當前觀測中心：**{ty['name_zh']} ({ty['name_en']})** 🌀")
 base_lat = ty["lat"]
 base_lon = ty["lon"]
 
-# 建立 7 條線路的起點與終點座標數據
+# 🔥 重新排版資料結構，確保所有括號 `[` 與 `]` 完美閉合，絕不報錯
 lines_data = [
-    # 🇹🇼 台灣中央氣象署 CWA (黃線)
-    {"name": "中央氣象局 CWA 線路", "color": [255, 255, 0], "path": [[base_lon, base_lat], [base_lon-1.9, base_lat+1.4], [base_lon-3.6, base_lat+3.4], [122.6, 24.2]]},
-    # 🇹🇼 台灣災防中心 NCDR (藍線)
-    {"name": "台灣 NCDR 線路", "color": [0, 128, 255], "path": [[base_lon, base_lat], [base_lon-2.0, base_lat+1.2], [base_lon-4.2, base_lat+2.9], [121.2, 23.0]]},
-    # 🇪🇺 歐洲中期預報 ECMWF (青色線)
-    {"name": "歐洲 ECMWF 線路", "color": [0, 255, 255], "path": [[base_lon, base_lat], [base_lon-2.0, base_lat+1.5], [base_lon-3.5, base_lat+3.5], [123.0, 24.5]]},
-    # 🇺🇸 美國聯合警報 JTWC (橘線)
-    {"name": "美國 JTWC 線路", "color": [255, 128, 0], "path": [[base_lon, base_lat], [base_lon-1.5, base_lat+1.8],
+    {
+        "name": "中央氣象局 CWA 線路 (黃)", 
+        "color": [255, 255, 0], 
+        "path": [[base_lon, base_lat], [base_lon-1.9, base_lat+1.4], [base_lon-3.6, base_lat+3.4], [122.6, 24.2]]
+    },
+    {
+        "name": "台灣 NCDR 線路 (藍)", 
+        "color": [0, 128, 255], 
+        "path": [[base_lon, base_lat], [base_lon-2.0, base_lat+1.2], [base_lon-4.2, base_lat+2.9], [121.2, 23.0]]
+    },
+    {
+        "name": "歐洲 ECMWF 線路 (青)", 
+        "color": [0, 255, 255], 
+        "path": [[base_lon, base_lat], [base_lon-2.0, base_lat+1.5], [base_lon-3.5, base_lat+3.5], [123.0, 24.5]]
+    },
+    {
+        "name": "美國 JTWC 線路 (橘)", 
+        "color": [255, 128, 0], 
+        "path": [[base_lon, base_lat], [base_lon-1.5, base_lat+1.8], [base_lon-2.5, base_lat+4.0], [125.0, 26.0]]
+    },
+    {
+        "name": "日本 JMA 線路 (粉紅)", 
+        "color": [255, 0, 255], 
+        "path": [[base_lon, base_lat],
