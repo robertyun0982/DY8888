@@ -48,5 +48,6 @@ st.markdown(f"**📍 實時中心座標：** `北緯 {base_lat} 度，東經 {ba
 # --- 4. 根據實時中心點，動態推算七大機構分歧「預測線路圖」 ---
 st.markdown("### 🗺️ 全球七大機構預測未來路徑走勢圖")
 
-lines_data = [
-    {"name": "中央氣象局 CWA 線路 (黃)", "color": [255, 255, 0], "path": [[base_lon, base_lat],
+# 🔥 終極修正：將所有路徑陣列完全獨立拆開出來宣告，徹底避開在一行內寫多層括號的語法解析 Bug！
+cwa_path = [[base_lon, base_lat], [base_lon-1.5, base_lat+1.5], [base_lon-3.2, base_lat+3.5], [base_lon-4.5, base_lat+5.5]]
+ncdr_path = [[base_lon, base_lat], [base_lon-1.8, base_lat+1.2], [base_lon-3.8, base_lat+2.8],
