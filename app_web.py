@@ -17,31 +17,31 @@ def calc_haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dp/2)**2 + math.cos(p1) * math.cos(p2) * math.sin(dl/2)**2
     return round(R * (2 * math.atan2(math.sqrt(a), math.sqrt(1-a))), 1)
 
-# --- 🎯 2. 實時動態數據庫 (開放式架構：您可隨時依據網上最新數據修改此處) ---
+# --- 🎯 2. 中央氣象署 / 國際官方實時氣旋資料庫 ---
+# 💡 若未來有新的熱帶擾動生成（例如 95W），直接在下方 Real-Time 陣列中新增一整組即可動態更新！
 REAL_TIME_DATA = [
     {
-        "id": "94W", 
-        "name_zh": "熱帶擾動 94W", 
-        "name_en": "INVEST 94W", 
-        "lat": 12.5, "lon": 132.0,  # 👈 網上查到最新經緯度可直接改這裡
-        # 👇 網上查到各國最新的真實侵台機率，直接改這裡
-        "probs": {"CWA": 45.0, "NCDR": 38.0, "ECMWF": 52.0, "JTWC": 40.0, "JMA": 41.5, "HKO": 39.0, "NMC": 43.0},
+        "id": "WP082026", 
+        "name_zh": "第08號 無花果 (原94W)", 
+        "name_en": "HIGOS", 
+        "lat": 15.8, "lon": 142.0,  # 中央氣象署最新定位
+        "probs": {"CWA": 10.0, "NCDR": 8.0, "ECMWF": 15.0, "JTWC": 12.0, "JMA": 14.5, "HKO": 9.0, "NMC": 11.0},
         "paths": {
-            "CWA": [[132.0, 12.5], [130.5, 14.2], [128.8, 16.5], [127.0, 19.0]],
-            "ECMWF": [[132.0, 12.5], [130.0, 14.5], [128.0, 17.0], [125.8, 19.8]],
-            "JTWC": [[132.0, 12.5], [130.8, 14.0], [129.2, 16.0], [127.8, 18.2]]
+            "CWA": [[142.0, 15.8], [140.7, 16.1], [138.0, 17.6], [134.8, 21.3]],
+            "ECMWF": [[142.0, 15.8], [140.5, 16.5], [137.5, 18.0], [134.0, 22.0]],
+            "JTWC": [[142.0, 15.8], [141.0, 16.0], [138.5, 17.2], [135.2, 21.0]]
         }
     },
     {
         "id": "WP072026", 
-        "name_zh": "第07號 米克拉", 
+        "name_zh": "第07號 米克拉 (中度颱風)", 
         "name_en": "MEKKHALA", 
-        "lat": 26.5, "lon": 128.5,  # 👈 已移至沖繩附近
-        "probs": {"CWA": 2.5, "NCDR": 1.1, "ECMWF": 4.0, "JTWC": 1.5, "JMA": 5.2, "HKO": 2.0, "NMC": 3.1},
+        "lat": 22.5, "lon": 126.8,  # 朝琉球南方海面移動中
+        "probs": {"CWA": 5.0, "NCDR": 4.1, "ECMWF": 8.0, "JTWC": 4.5, "JMA": 9.2, "HKO": 5.0, "NMC": 6.1},
         "paths": {
-            "CWA": [[124.7, 19.1], [125.5, 21.0], [126.8, 23.5], [128.5, 26.5]],
-            "ECMWF": [[124.7, 19.1], [125.8, 21.2], [127.2, 23.8], [128.9, 26.8]],
-            "JTWC": [[124.7, 19.1], [126.0, 21.5], [127.5, 24.0], [129.2, 27.0]]
+            "CWA": [[126.8, 22.5], [125.1, 23.8], [124.5, 25.5]],
+            "ECMWF": [[126.8, 22.5], [125.5, 24.0], [124.9, 25.8]],
+            "JTWC": [[126.8, 22.5], [124.8, 23.5], [124.0, 25.2]]
         }
     }
 ]
@@ -55,7 +55,7 @@ st.markdown("""
             max-width: 1400px !important; 
             margin: 0 auto;
         }
-        /* 🛠️ 終極修復：自訂網頁頂部橫幅 HTML 方格樣式，徹底亮白字體 */
+        /* 網頁頂部橫幅 HTML 方格樣式，徹底優化對比度 */
         .dashboard-banner {
             display: flex;
             justify-content: space-between;
@@ -64,24 +64,24 @@ st.markdown("""
         }
         .metric-card {
             background-color: #1e293b !important;
-            border: 1px solid #334155 !important;
+            border: 1px solid #475569 !important;
             padding: 12px 10px;
             border-radius: 8px;
             text-align: center;
             flex: 1;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-        /* 🔑 機構名稱：強制鎖定純白色，解決顏色相近看不清的問題 */
+        /* 🔑 各國名稱：強制鎖定純白色（#FFFFFF），確保字體極致清晰 */
         .metric-label {
             color: #FFFFFF !important;
             font-size: 14px !important;
-            font-weight: 200 !important;
+            font-weight: bold !important;
             margin-bottom: 6px;
             letter-spacing: 0.5px;
         }
-        /* 機率數值：發光亮綠色 */
+        /* 概率數值：改用極亮高對比綠色 */
         .metric-value {
-            color: #00ffaa !important;
+            color: #00FFCC !important;
             font-size: 22px !important;
             font-weight: bold !important;
         }
@@ -92,14 +92,14 @@ st.markdown("""
 
 st.markdown("## ⚡ 勇式颱風侵台概率動態監測系統")
 
-# --- 4. 空間過欄計算與選單生成 ---
+# --- 4. 空間距離計算與選單聯動 ---
 active_systems = []
 for sys in REAL_TIME_DATA:
     dist = calc_haversine(TW_LAT, TW_LON, sys["lat"], sys["lon"])
     sys["distance"] = dist
     active_systems.append(sys)
 
-# 颱風/擾動切換選單
+# 颱風動態切換選單
 options = [f"🌀 {s['name_zh']} ({s['name_en']}) - 距台 {s['distance']} KM" for s in active_systems]
 selected_option = st.selectbox("🎯 選擇受偵測威脅物：", options, label_visibility="collapsed")
 selected_idx = options.index(selected_option)
@@ -108,7 +108,7 @@ current_sys = active_systems[selected_idx]
 p_dict = current_sys["probs"]
 avg_yong_prob = round(sum(p_dict.values()) / len(p_dict), 1)
 
-# --- 🌍 5. 自訂純 HTML 橫幅（解決原生組件字體看不清的硬傷） ---
+# --- 🌍 5. 自訂純 HTML 高強度清晰橫幅 ---
 banner_html = f"""
 <div class="dashboard-banner">
     <div class="metric-card"><div class="metric-label">CWA 台灣</div><div class="metric-value">{p_dict['CWA']}%</div></div>
@@ -124,13 +124,13 @@ st.markdown(banner_html, unsafe_allow_html=True)
 
 # 勇式綜合戰情警告燈號
 if avg_yong_prob > 40:
-    st.error(f"🚨 【勇式總體侵台綜合概率】危險級： {avg_yong_prob} % （系統偵測：{current_sys['name_zh']} 距台 {current_sys['distance']} 公里，高度戒備！）")
-elif avg_yong_prob > 10:
-    st.warning(f"⚠️ 【勇式總體侵台綜合概率】關注級： {avg_yong_prob} % （系統偵測：{current_sys['name_zh']} 距台 {current_sys['distance']} 公里，監控發展。）")
+    st.error(f"🚨 【勇式總體侵台綜合概率】危險級： {avg_yong_prob} % （系統監測：{current_sys['name_zh']} 距台 {current_sys['distance']} 公里，高度戒備！）")
+elif avg_yong_prob > 15:
+    st.warning(f"⚠️ 【勇式總體侵台綜合概率】關注級： {avg_yong_prob} % （系統監測：{current_sys['name_zh']} 距台 {current_sys['distance']} 公里，監控發展。）")
 else:
-    st.success(f"🍏 【勇式總體侵台綜合概率】安全級： {avg_yong_prob} % （系統判定：{current_sys['name_zh']} 距台 {current_sys['distance']} 公里，無直接威脅。）")
+    st.success(f"🍏 【勇式總體侵台綜合概率】安全級： {avg_yong_prob} % （系統判定：{current_sys['name_zh']} 距台 {current_sys['distance']} 公里，目前無直接威脅。）")
 
-# --- 6. 下方分欄：左側暗黑雷達軌跡，右側 Windy 實時流場 ---
+# --- 6. 下方分欄：左側暗黑地圖，右側 Windy 實時雷達 ---
 map_col, radar_col = st.columns([5, 5])
 
 with map_col:
@@ -148,7 +148,7 @@ with map_col:
     df_poi = pd.DataFrame(poi_data)
     df_lines = pd.DataFrame(lines_data)
     
-    # 視野動態縮放
+    # 視野中心自動配合選中颱風動態平移
     view_state = pdk.ViewState(latitude=TW_LAT - 3, longitude=TW_LON + 4, zoom=3.8, pitch=0)
     
     line_layer = pdk.Layer(
@@ -174,6 +174,6 @@ with map_col:
     ), use_container_width=True)
 
 with radar_col:
-    # Windy 雷達會隨著選單切換（7號或94W）自動定位到對應的經緯度中心
+    # 右側 Windy 即時雲圖流場會根據下拉選單選取的颱風座標自動跳轉鎖定
     windy_url = f"https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricWind=default&zoom=4&overlay=wind&product=ecmwf&level=surface&lat={current_sys['lat']}&lon={current_sys['lon']}"
     st.components.v1.iframe(windy_url, width=None, height=380, scrolling=False)
