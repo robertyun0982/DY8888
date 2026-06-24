@@ -3,7 +3,7 @@ import pandas as pd
 import pydeck as pdk
 import math
 
-# 1. 網頁基礎設定（強制全寬、極致防汛戰情室排版）
+# 1. 網頁基礎設定（放寬左右邊界，達到舒適的大螢幕戰情室視野）
 st.set_page_config(page_title="勇式雙颱侵台概率暨全台降雨監測戰情室", page_icon="⚡", layout="wide")
 
 # 台灣地理中心點與屏東縣基準座標
@@ -18,58 +18,59 @@ def calc_haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dp/2)**2 + math.cos(p1) * math.cos(p2) * math.sin(dl/2)**2
     return round(R * (2 * math.atan2(math.sqrt(a), math.sqrt(1-a))), 1)
 
-# --- 🚀 2. 戰情室專用進階 CSS 操控 (精準控制全區塊高度切齊、寬度優化) ---
+# --- 🚀 2. 戰情室專用進階 CSS 操控 (放寬邊界、改為彈性高度防止跑版) ---
 st.markdown("""
     <style>
-        /* 全域容器微調，寬度放大，減少上下留白 */
+        /* 🎨 左右邊界再加寬，讓戰情室舒展開來 */
         .block-container {
-            padding-top: 0.8rem !important; 
-            padding-bottom: 0px !important; 
-            max-width: 1560px !important; 
+            padding-top: 1.0rem !important; 
+            padding-bottom: 1.0rem !important; 
+            padding-left: 2.5rem !important;
+            padding-right: 2.5rem !important;
+            max-width: 1700px !important; 
             margin: 0 auto;
         }
         
-        /* 🎯 最左側條列式：極致緊湊、更窄、更長 */
+        /* 最左側條列式：改為自適應彈性高度，解決擠壓跑版問題 */
         .sidebar-prob-container {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 8px;
             background-color: #0f172a;
-            padding: 8px;
-            border-radius: 6px;
+            padding: 12px;
+            border-radius: 8px;
             border: 1px solid #334155;
-            height: 580px; /* 強制與地圖同高，變長 */
-            justify-content: space-between; /* 均勻拉長分配 */
+            min-height: 480px;
         }
         .prob-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 6px 8px;
+            padding: 8px 10px;
             border-radius: 4px;
             background-color: #1e293b;
             font-weight: bold;
         }
         .prob-label {
             color: #94a3b8 !important;
-            font-size: 12px;
+            font-size: 13px;
         }
         .prob-value {
             font-size: 14px;
         }
         
         /* 機構條列左邊框色彩 */
-        .cwa-border { border-left: 3px solid rgb(255,59,48); } .cwa-text { color: rgb(255,59,48); }
-        .ncdr-border { border-left: 3px solid rgb(255,149,0); } .ncdr-text { color: rgb(255,149,0); }
-        .ecmwf-border { border-left: 3px solid rgb(255,214,10); } .ecmwf-text { color: rgb(255,214,10); }
-        .jtwc-border { border-left: 3px solid rgb(52,211,153); } .jtwc-text { color: rgb(52,211,153); }
-        .jma-border { border-left: 3px solid rgb(0,199,190); } .jma-text { color: rgb(0,199,190); }
-        .hko-border { border-left: 3px solid rgb(0,122,255); } .hko-text { color: rgb(0,122,255); }
-        .nmc-border { border-left: 3px solid rgb(175,82,222); } .nmc-text { color: rgb(175,82,222); }
+        .cwa-border { border-left: 4px solid rgb(255,59,48); } .cwa-text { color: rgb(255,59,48); }
+        .ncdr-border { border-left: 4px solid rgb(255,149,0); } .ncdr-text { color: rgb(255,149,0); }
+        .ecmwf-border { border-left: 4px solid rgb(255,214,10); } .ecmwf-text { color: rgb(255,214,10); }
+        .jtwc-border { border-left: 4px solid rgb(52,211,153); } .jtwc-text { color: rgb(52,211,153); }
+        .jma-border { border-left: 4px solid rgb(0,199,190); } .jma-text { color: rgb(0,199,190); }
+        .hko-border { border-left: 4px solid rgb(0,122,255); } .hko-text { color: rgb(0,122,255); }
+        .nmc-border { border-left: 4px solid rgb(175,82,222); } .nmc-text { color: rgb(175,82,222); }
 
-        /* 🎯 地圖元件大升級：高度拉到 580px，寬度自適應更寬 */
+        /* 地圖元件高度微調為穩定之 520px，寬度寬敞 */
         .stPydeckChart {
-            height: 580px !important; 
+            height: 520px !important; 
             border-radius: 8px; 
             overflow: hidden; 
             background-color: #0f172a;
@@ -79,52 +80,44 @@ st.markdown("""
         .pingtung-box {
             background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
             border: 2px solid #38bdf8;
-            padding: 12px;
+            padding: 15px;
             border-radius: 8px;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             color: #f8fafc;
         }
         .pingtung-title {
-            font-size: 16px;
+            font-size: 17px;
             font-weight: bold;
             color: #38bdf8;
             border-bottom: 1px solid #38bdf8;
-            padding-bottom: 4px;
-            margin-bottom: 8px;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
         }
         
-        /* 🎯 右側與中右側大框：全部鎖定 580px 高度，達成下底完美切齊 */
-        .data-container-box {
-            height: 580px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
+        /* 右側專業戰情總結：彈性高度自適應，帶有自然滾動條防止大段文字爆框 */
         .summary-box {
             background-color: #111827;
             border-left: 5px solid #00FFCC;
-            padding: 15px;
+            padding: 20px;
             border-radius: 4px;
             color: #e5e7eb;
-            height: 580px; /* 強制與左側及地圖下底切齊 */
-            overflow: auto; /* 防止內容微調時溢出 */
+            min-height: 520px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }
         .summary-title {
-            font-size: 17px;
+            font-size: 18px;
             font-weight: bold;
             color: #00FFCC;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             border-bottom: 1px solid #1f2937;
-            padding-bottom: 5px;
+            padding-bottom: 6px;
         }
         .summary-box p {
-            margin-bottom: 6px;
-            line-height: 1.4;
-            font-size: 13.5px;
+            margin-bottom: 8px;
+            line-height: 1.5;
+            font-size: 14px;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -210,19 +203,18 @@ if current_sys["has_rain_threat"]:
 else:
     st.success(f"🍏 【侵台綜合概率：0.0%】{current_sys['name_zh']}正名確立。在遠海即大角度北轉，對台無影響。")
 
-# --- 🚀 4. 核心排版重構：更小的最左側、更大的中間地圖、完美切齊的下底 ---
-# 調整比例 [14, 54, 32] 讓左側縮到最小，中間地圖寬度拉到最大，右側總結分流
-left_main_col, right_summary_col = st.columns([70, 30], gap="medium")
+# --- 🚀 4. 全新比例分欄配置：左右加寬，排除爆框跑版現象 ---
+left_main_col, right_summary_col = st.columns([68, 32], gap="large")
 
 with left_main_col:
-    # 再次比例切分：[16, 52, 32] -> 左側機構極小化、地圖極大化寬敞、屏東數據中等
-    list_col, map_col, data_col = st.columns([15, 53, 32], gap="small")
+    # 重新配置左側子欄位比例 [18, 50, 32]，給予地圖和條列更舒適的伸展空間
+    list_col, map_col, data_col = st.columns([18, 50, 32], gap="small")
     
     with list_col:
-        # 🎯 左側條列：更小更窄、強制高度 580px 拉長
+        # 最左側機構條列（長型自適應）
         st.markdown(f"""
         <div class="sidebar-prob-container">
-            <div style="font-size:11px; font-weight:bold; color:#64748b; text-align:center; border-bottom:1px solid #1e293b; padding-bottom:3px;">🌐 各國侵台率</div>
+            <div style="font-size:12px; font-weight:bold; color:#64748b; text-align:center; border-bottom:1px solid #1e293b; padding-bottom:5px; margin-bottom:5px;">🌐 各國侵台率</div>
             <div class="prob-row cwa-border"><span class="prob-label">CWA</span><span class="prob-value cwa-text">{p_dict.get('CWA', 0.0)}%</span></div>
             <div class="prob-row ncdr-border"><span class="prob-label">NCDR</span><span class="prob-value ncdr-text">{p_dict.get('NCDR', 0.0)}%</span></div>
             <div class="prob-row ecmwf-border"><span class="prob-label">ECMWF</span><span class="prob-value ecmwf-text">{p_dict.get('ECMWF', 0.0)}%</span></div>
@@ -234,7 +226,7 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 🎯 中間地圖：高度拉大至 580px 且佔比更寬
+        # 中間地圖：寬度與視野放大
         df_circles = pd.DataFrame(current_sys["circles"])
         df_paths = pd.DataFrame(current_sys["paths"])
         map_layers = []
@@ -255,22 +247,21 @@ with left_main_col:
         st.pydeck_chart(pdk.Deck(map_provider=None, map_style=None, initial_view_state=view_state, layers=map_layers), use_container_width=True)
 
     with data_col:
-        # 🎯 屏東數據欄位：與地圖下底完美切齊
-        st.markdown('<div class="data-container-box">', unsafe_allow_html=True)
+        # 屏東數據欄位（自動貼合，絕不跑版）
         rf = current_sys["rain_forecast"]
         st.markdown(f"""
         <div class="pingtung-box">
             <div class="pingtung-title">📍 屏東縣降雨防汛面板</div>
-            <table style="width:100%; border-collapse: collapse; font-size:12.5px;">
-                <tr style="border-bottom: 1px solid #334155;"><td style="padding:5px 0; color:#94a3b8;">監測區域</td><td style="font-weight:bold; color:#f43f5e;">{rf['county']} 全區</td></tr>
-                <tr style="border-bottom: 1px solid #334155;"><td style="padding:5px 0; color:#94a3b8;">5日累積雨量</td><td style="font-weight:bold; color:#38bdf8; font-size:15px;">{rf['accumulated_5day']}</td></tr>
-                <tr style="border-bottom: 1px solid #334155;"><td style="padding:5px 0; color:#94a3b8;">核心降雨時段</td><td style="font-weight:bold; color:#fbbf24;">{', '.join(rf['rain_days'])}</td></tr>
-                <tr><td style="padding:5px 0; color:#94a3b8;">風險強度</td><td style="font-weight:bold; color:#ef4444;">{rf['alert_level']}</td></tr>
+            <table style="width:100%; border-collapse: collapse; font-size:13px;">
+                <tr style="border-bottom: 1px solid #334155;"><td style="padding:6px 0; color:#94a3b8;">監測區域</td><td style="font-weight:bold; color:#f43f5e;">{rf['county']} 全區</td></tr>
+                <tr style="border-bottom: 1px solid #334155;"><td style="padding:6px 0; color:#94a3b8;">5日累積雨量</td><td style="font-weight:bold; color:#38bdf8; font-size:15px;">{rf['accumulated_5day']}</td></tr>
+                <tr style="border-bottom: 1px solid #334155;"><td style="padding:6px 0; color:#94a3b8;">核心降雨時段</td><td style="font-weight:bold; color:#fbbf24;">{', '.join(rf['rain_days'])}</td></tr>
+                <tr><td style="padding:6px 0; color:#94a3b8;">風險強度</td><td style="font-weight:bold; color:#ef4444;">{rf['alert_level']}</td></tr>
             </table>
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<p style='font-size:13px; font-weight:bold; margin-bottom:2px;'>📅 逐日降雨概率與風險趨勢</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size:13px; font-weight:bold; margin-bottom:5px;'>📅 逐日降雨概率與風險趨勢</p>", unsafe_allow_html=True)
         df_timeline = pd.DataFrame(rf["timeline"])
         st.dataframe(
             df_timeline,
@@ -279,12 +270,11 @@ with left_main_col:
                 "prob": st.column_config.ProgressColumn("降雨概率", min_value=0, max_value=100, format="%d%%"),
                 "desc": "天氣說明"
             },
-            hide_index=True, use_container_width=True, height=295 # 微調表格高度，讓下緣與地圖完美切齊
+            hide_index=True, use_container_width=True, height=240 # 移除強制高度，改用自然組件高度
         )
-        st.markdown('</div>', unsafe_allow_html=True)
 
 with right_summary_col:
-    # 🎯 右側總結：高度牢牢固鎖在 580px，下底與左邊、中間完全齊平
+    # 右側總結：與左邊區塊保持大型間距，且寬度足夠，文字排版非常舒服
     st.markdown(f"""
     <div class="summary-box">
         <div>
@@ -298,7 +288,7 @@ with right_summary_col:
             • <b>6/25 (四) 【強降雨高峰】</b>：屏東降雨機率高達 <b>85%</b>，山區及恆春半島嚴防豪雨。<br>
             • <b>6/26 (五) 上半天</b>：水氣持續移入，降雨機率 <b>70%</b>，仍有大雨風險。</p>
         </div>
-        <div style="font-size:12px; color:#64748b; border-top:1px solid #1f2937; padding-top:5px; text-align:right;">
+        <div style="font-size:12px; color:#64748b; border-top:1px solid #1f2937; padding-top:6px; text-align:right; margin-top:10px;">
             ⚡ 勇式防汛戰情室 • 實時監測中
         </div>
     </div>
