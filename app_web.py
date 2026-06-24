@@ -10,14 +10,14 @@ st.set_page_config(page_title="勇式颱風侵台概率監測系統", page_icon=
 TW_LAT, TW_LON = 23.97, 120.97
 
 def calc_haversine(lat1, lon1, lat2, lon2):
-    """ 地球大圓距離空間圍欄核心演算法 (單位: 公里) """
+    """ 地球大圓距離空間圍欄核心演痕 (單位: 公里) """
     R = 6371.0
     p1, p2 = math.radians(lat1), math.radians(lat2)
     dp, dl = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
     a = math.sin(dp/2)**2 + math.cos(p1) * math.cos(p2) * math.sin(dl/2)**2
     return round(R * (2 * math.atan2(math.sqrt(a), math.sqrt(1-a))), 1)
 
-# --- 🚀 2. 戰情室專用高級 CSS 操控 ---
+# --- 🚀 2. 戰情室專用高級 CSS 操控 (色彩美學聯動升級) ---
 st.markdown("""
     <style>
         .block-container {
@@ -35,14 +35,14 @@ st.markdown("""
         }
         .metric-card {
             background-color: #1e293b !important;
-            border: 1px solid #475569 !important;
             padding: 12px 10px;
             border-radius: 8px;
             text-align: center;
             flex: 1;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
         }
-        /* 鎖定純白色（#FFFFFF）各國機構成稱 */
+        /* 各國名稱字體：全白加粗 */
         .metric-label {
             color: #FFFFFF !important;
             font-size: 14px !important;
@@ -51,11 +51,33 @@ st.markdown("""
             letter-spacing: 0.5px;
         }
         .metric-value {
-            color: #00FFCC !important;
-            font-size: 22px !important;
+            font-size: 24px !important;
             font-weight: bold !important;
         }
-        /* 🗺️ 地圖區自訂右側 7 國顏色圖例面板 */
+        
+        /* 🎨 7國色彩美學定義：完美聯動頂部框線與底部地圖線 */
+        .cwa-card { border: 2px solid rgb(255,59,48) !important; }
+        .cwa-val { color: rgb(255,59,48) !important; }
+        
+        .ncdr-card { border: 2px solid rgb(255,149,0) !important; }
+        .ncdr-val { color: rgb(255,149,0) !important; }
+        
+        .ecmwf-card { border: 2px solid rgb(255,214,10) !important; }
+        .ecmwf-val { color: rgb(255,214,10) !important; }
+        
+        .jtwc-card { border: 2px solid rgb(52,211,153) !important; }
+        .jtwc-val { color: rgb(52,211,153) !important; }
+        
+        .jma-card { border: 2px solid rgb(0,199,190) !important; }
+        .jma-val { color: rgb(0,199,190) !important; }
+        
+        .hko-card { border: 2px solid rgb(0,122,255) !important; }
+        .hko-val { color: rgb(0,122,255) !important; }
+        
+        .nmc-card { border: 2px solid rgb(175,82,222) !important; }
+        .nmc-val { color: rgb(175,82,222) !important; }
+
+        /* 地圖區自訂圖例面板 */
         .map-container {
             position: relative;
         }
@@ -63,7 +85,7 @@ st.markdown("""
             position: absolute;
             top: 10px;
             right: 10px;
-            background-color: rgba(15, 23, 42, 0.85);
+            background-color: rgba(15, 23, 42, 0.9);
             border: 1px solid #475569;
             padding: 12px;
             border-radius: 6px;
@@ -80,7 +102,7 @@ st.markdown("""
         }
         .legend-color {
             width: 30px;
-            height: 4px;
+            height: 5px;
             margin-right: 8px;
             border-radius: 2px;
         }
@@ -92,7 +114,6 @@ st.markdown("""
 st.markdown("## ⚡ 勇式颱風侵台概率動態監測系統")
 
 # --- 🎯 3. 7 國機構 × 5 天完整預報軌跡資料庫 ---
-# 座標點依序為：[0天當前, 1天預報, 2天預報, 3天預報, 4天預報, 5天預報]
 REAL_TIME_DATA = [
     {
         "id": "WP082026", 
@@ -143,16 +164,16 @@ current_sys = active_systems[selected_idx]
 p_dict = current_sys["probs"]
 avg_yong_prob = round(sum(p_dict.values()) / len(p_dict), 1)
 
-# --- 🌍 5. 頂部高強度 HTML 橫幅（各國字體全白粗體） ---
+# --- 🌍 5. 頂部高強度色彩聯動橫幅 (美觀度全面升級) ---
 banner_html = f"""
 <div class="dashboard-banner">
-    <div class="metric-card"><div class="metric-label">CWA 台灣</div><div class="metric-value">{p_dict['CWA']}%</div></div>
-    <div class="metric-card"><div class="metric-label">NCDR 災害</div><div class="metric-value">{p_dict['NCDR']}%</div></div>
-    <div class="metric-card"><div class="metric-label">ECMWF 歐洲</div><div class="metric-value">{p_dict['ECMWF']}%</div></div>
-    <div class="metric-card"><div class="metric-label">JTWC 美軍</div><div class="metric-value">{p_dict['JTWC']}%</div></div>
-    <div class="metric-card"><div class="metric-label">JMA 日本</div><div class="metric-value">{p_dict['JMA']}%</div></div>
-    <div class="metric-card"><div class="metric-label">HKO 香港</div><div class="metric-value">{p_dict['HKO']}%</div></div>
-    <div class="metric-card"><div class="metric-label">NMC 中國</div><div class="metric-value">{p_dict['NMC']}%</div></div>
+    <div class="metric-card cwa-card"><div class="metric-label">CWA 台灣</div><div class="metric-value cwa-val">{p_dict['CWA']}%</div></div>
+    <div class="metric-card ncdr-card"><div class="metric-label">NCDR 災害</div><div class="metric-value ncdr-val">{p_dict['NCDR']}%</div></div>
+    <div class="metric-card ecmwf-card"><div class="metric-label">ECMWF 歐洲</div><div class="metric-value ecmwf-val">{p_dict['ECMWF']}%</div></div>
+    <div class="metric-card jtwc-card"><div class="metric-label">JTWC 美軍</div><div class="metric-value jtwc-val">{p_dict['JTWC']}%</div></div>
+    <div class="metric-card jma-card"><div class="metric-label">JMA 日本</div><div class="metric-value jma-val">{p_dict['JMA']}%</div></div>
+    <div class="metric-card hko-card"><div class="metric-label">HKO 香港</div><div class="metric-value hko-val">{p_dict['HKO']}%</div></div>
+    <div class="metric-card nmc-card"><div class="metric-label">NMC 中國</div><div class="metric-value nmc-val">{p_dict['NMC']}%</div></div>
 </div>
 """
 st.markdown(banner_html, unsafe_allow_html=True)
@@ -169,10 +190,9 @@ else:
 map_col, radar_col = st.columns([5, 5])
 
 with map_col:
-    # 使用容器包裝地圖，以便插入絕對定位的 7 國圖例
     st.markdown('<div class="map-container">', unsafe_allow_html=True)
     
-    # 打造 7 國獨立的預報線路圖層
+    # 打造 7 國預報線路圖層
     layers = []
     df_paths = pd.DataFrame(current_sys["paths"])
     
@@ -187,7 +207,7 @@ with map_col:
             get_width=5
         ))
     
-    # 基準點與定位點圖層
+    # 地標點
     poi_data = [
         {"label": "TAIWAN 台灣中心", "lon": TW_LON, "lat": TW_LAT, "size": 35000, "color": [0, 149, 255]},
         {"label": f"中心定位: {current_sys['name_zh']}", "lon": current_sys["lon"], "lat": current_sys["lat"], "size": 45000, "color": [255, 255, 255]}
@@ -203,16 +223,14 @@ with map_col:
         get_color=[248, 250, 252], get_size=15, get_alignment_baseline="'bottom'"
     ))
     
-    # 視野高度最佳化（容納 5 天後的長距離路徑）
     view_state = pdk.ViewState(latitude=TW_LAT - 4, longitude=TW_LON + 6, zoom=3.3, pitch=0)
     
-    # 渲染 Pydeck 地圖
     st.pydeck_chart(pdk.Deck(
         map_provider=None, map_style=None,
         initial_view_state=view_state, layers=layers
     ), use_container_width=True)
     
-    # 🔑 戰情室核心：直接用網頁 CSS 灌入 7 國專屬顏色圖例，杜絕標記不清！
+    # 右上角 7 國色彩圖例面板 (色彩全面與上方外框同步)
     legend_html = """
     <div class="legend-panel">
         <div style="font-weight:bold; margin-bottom:6px; border-bottom:1px solid #475569; padding-bottom:2px;">7國路徑圖例 (5天預報)</div>
@@ -229,6 +247,6 @@ with map_col:
     st.markdown('</div>', unsafe_allow_html=True)
 
 with radar_col:
-    # Windy 嵌入組件高度同步對齊
+    # 右側 Windy 實時流場自動伴隨
     windy_url = f"https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricWind=default&zoom=4&overlay=wind&product=ecmwf&level=surface&lat={current_sys['lat']}&lon={current_sys['lon']}"
     st.components.v1.iframe(windy_url, width=None, height=450, scrolling=False)
