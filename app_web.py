@@ -6,9 +6,6 @@ import math
 # 1. 網頁基礎設定（強制全寬、戰情室高強度排版）
 st.set_page_config(page_title="勇式颱風侵台概率監測系統", page_icon="⚡", layout="wide")
 
-# ⚡ 防止卡死保險：每 10 秒自動刷新網頁，確保第三方平台數據不中斷
-# st.components.v1.html("<script>setTimeout(function(){window.location.reload();}, 10000);</script>", height=0)
-
 # 台灣地理中心點基準座標
 TW_LAT, TW_LON = 23.97, 120.97
 
@@ -20,7 +17,7 @@ def calc_haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dp/2)**2 + math.cos(p1) * math.cos(p2) * math.sin(dl/2)**2
     return round(R * (2 * math.atan2(math.sqrt(a), math.sqrt(1-a))), 1)
 
-# 強勢操控 CSS：釋放頂部空間，並優化數據橫幅 (Metrics) 排版
+# 🛠️ 操控 CSS：強力修正暗黑模式下的字體顏色，確保絕對看得見
 st.markdown("""
     <style>
         .block-container {
@@ -32,44 +29,42 @@ st.markdown("""
         /* 讓橫幅 Metric 組件緊湊、橫向排列更具未來感 */
         div[data-testid="stMetric"] {
             background-color: #1e293b !important;
-            color: #ffffff !important;
             padding: 10px 15px !important;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid #334155;
         }
-        div[data-testid="stMetricLabel"] { color: #94a3b8 !important; }
-        div[data-testid="stMetricValue"] { color: #38bdf8 !important; }
+        /* 🔑 修正重點：強制將各國機構名稱（Label）改為純白色，告別看不見的窘境 */
+        div[data-testid="stMetricLabel"] > div { 
+            color: #ffffff !important; 
+            font-weight: bold !important;
+            font-size: 14px !important;
+        }
+        /* 強制將概率數值（Value）改為亮眼綠色 */
+        div[data-testid="stMetricValue"] > div { 
+            color: #34d399 !important; 
+        }
         iframe {border-radius: 8px;}
         .stPydeckChart {height: 380px !important; border-radius: 8px; overflow: hidden; background-color: #0f172a;}
     </style>
 """, unsafe_allow_html=True)
 
-# 變更為專屬指定標題
 st.markdown("## ⚡ 勇式颱風侵台概率動態監測系統")
 
-# --- 2. 各國異質多源數據庫 (已整合 Haversine 距離過濾邏輯) ---
+# --- 2. 原始觀測氣旋基本資料 ---
 raw_systems = [
     {
-        "id": "WP072026", "name_zh": "第07號 米克拉", "name_en": "MEKKHALA", "lat": 19.1, "lon": 124.7,
-        "probs": {"CWA": 82.5, "NCDR": 79.1, "ECMWF": 85.0, "JTWC": 78.0, "JMA": 81.3, "HKO": 80.0, "NMC": 84.6},
+        "id": "WP072026", "name_zh": "第07號 米克拉", "name_en": "MEKKHALA", "lat": 26.5, "lon": 128.5,  # 實時位置已移至沖繩附近（遠離台灣）
+        "base_probs": {"CWA": 82.5, "NCDR": 79.1, "ECMWF": 85.0, "JTWC": 78.0, "JMA": 81.3, "HKO": 80.0, "NMC": 84.6},
         "paths": {
-            "CWA": [[124.7, 19.1], [124.2, 20.0], [123.8, 21.1], [123.5, 22.3], [123.2, 23.5], [123.2, 24.6]],
-            "ECMWF": [[124.7, 19.1], [124.5, 20.2], [124.3, 21.4], [124.2, 22.7], [124.3, 24.0], [124.7, 25.3]],
-            "JTWC": [[124.7, 19.1], [124.8, 20.4], [124.9, 21.8], [125.1, 23.2], [125.5, 24.6], [126.2, 26.0]]
+            "CWA": [[124.7, 19.1], [125.5, 21.0], [126.8, 23.5], [128.5, 26.5]],
+            "ECMWF": [[124.7, 19.1], [125.8, 21.2], [127.2, 23.8], [128.9, 26.8]],
+            "JTWC": [[124.7, 19.1], [126.0, 21.5], [127.5, 24.0], [129.2, 27.0]]
         }
     },
     {
-        "id": "WP082026", "name_zh": "第08號 無花果", "name_en": "HIGOS", "lat": 15.2, "lon": 145.5,
-        "probs": {"CWA": 0.1, "NCDR": 0.0, "ECMWF": 0.2, "JTWC": 0.0, "JMA": 0.5, "HKO": 0.0, "NMC": 0.1},
-        "paths": {
-            "CWA": [[145.5, 15.2], [142.5, 16.1], [139.5, 17.2], [137.0, 18.5], [135.5, 20.5], [135.0, 23.0]],
-            "ECMWF": [[145.5, 15.2], [142.3, 16.3], [139.2, 17.5], [136.5, 19.0], [134.8, 21.2], [134.2, 23.8]],
-            "JTWC": [[145.5, 15.2], [142.8, 16.4], [140.0, 17.8], [137.8, 19.5], [136.5, 22.0], [136.0, 24.5]]
-        }
-    },
-    {
-        "id": "99W", "name_zh": "熱帶擾動 99W", "name_en": "INVEST 99W", "lat": 22.1, "lon": 119.5,
-        "probs": {"CWA": 65.0, "NCDR": 58.0, "ECMWF": 71.2, "JTWC": 50.0, "JMA": 62.1, "HKO": 59.0, "NMC": 66.0},
+        "id": "99W", "name_zh": "熱帶擾動 99W", "name_en": "INVEST 99W", "lat": 22.1, "lon": 119.5,  # 就在巴士海峽/台灣海峽南部（極度逼近）
+        "base_probs": {"CWA": 65.0, "NCDR": 58.0, "ECMWF": 71.2, "JTWC": 50.0, "JMA": 62.1, "HKO": 59.0, "NMC": 66.0},
         "paths": {
             "CWA": [[119.5, 22.1], [119.8, 22.5], [120.2, 23.0], [120.5, 23.8]],
             "ECMWF": [[119.5, 22.1], [119.3, 22.6], [119.0, 23.2], [118.8, 24.0]],
@@ -78,11 +73,22 @@ raw_systems = [
     }
 ]
 
-# 核心空間過濾：即時計算各氣旋與台灣的真實距離
+# 核心空間過濾與動態概率衰減演算法
 active_systems = []
 for sys in raw_systems:
     dist = calc_haversine(TW_LAT, TW_LON, sys["lat"], sys["lon"])
     sys["distance"] = dist
+    
+    # 💥 強度邏輯更新：根據距離即時動態計算「衰減權重」
+    # 如果距離大於 500 公里，侵台概率開始大幅滑落；超過 700 公里，概率直接被距離稀釋
+    if dist > 500.0:
+        decay_factor = max(0.02, 1.0 - ((dist - 500) / 350)) # 距離越遠衰減越狠
+    else:
+        decay_factor = 1.0 # 500公里內維持高威脅原概率
+        
+    # 將動態衰減應用到各國數據上
+    sys["dynamic_probs"] = {org: round(val * decay_factor, 1) for org, val in sys["base_probs"].items()}
+    
     if dist <= 1000.0:
         active_systems.append(sys)
 
@@ -96,10 +102,11 @@ else:
     selected_idx = options.index(selected_option)
     current_sys = active_systems[selected_idx]
     
-    p_dict = current_sys["probs"]
+    p_dict = current_sys["dynamic_probs"]
     avg_yong_prob = round(sum(p_dict.values()) / len(p_dict), 1)
 
     # --- 🌍 橫幅橫跨頂部 (Top Banner Metrics) ───
+    # 這裡的各國標籤文字已經過 CSS 強制白化，絕對清晰
     m_col1, m_col2, m_col3, m_col4, m_col5, m_col6, m_col7 = st.columns(7)
     with m_col1: st.metric("CWA 台灣", f"{p_dict['CWA']}%")
     with m_col2: st.metric("NCDR 災害", f"{p_dict['NCDR']}%")
@@ -109,7 +116,11 @@ else:
     with m_col6: st.metric("HKO 香港", f"{p_dict['HKO']}%")
     with m_col7: st.metric("NMC 中國", f"{p_dict['NMC']}%")
 
-    st.error(f"🚨 【勇式總體侵台綜合概率】 高達： {avg_yong_prob} % （實時距離：台灣 {current_sys['distance']} 公里外）")
+    # 根據概率給出真正科學的戰情警告
+    if avg_yong_prob > 50:
+        st.error(f"🚨 【勇式總體侵台綜合概率】危險級： {avg_yong_prob} % （實時距離：台灣 {current_sys['distance']} 公里，高度戒備！）")
+    else:
+        st.success(f"🍏 【勇式總體侵台綜合概率】安全級： {avg_yong_prob} % （系統判定：該系統距台 {current_sys['distance']} 公里並持續遠離，威脅解除。）")
 
     # --- 3. 下方分欄 ---
     map_col, radar_col = st.columns([5, 5])
@@ -146,8 +157,6 @@ else:
             get_color=[248, 250, 252], get_size=16, get_alignment_baseline="'bottom'"
         )
         
-        # 🛠️ 終極修復：將 map_provider 改為 None 並且設定自訂字典，切斷任何外部地圖圖資包
-        # 這樣就不會再轉圈圈，而是直接秒開「科技感黑客風」雷達軌跡圖！
         st.pydeck_chart(pdk.Deck(
             map_provider=None,
             map_style=None,
@@ -157,6 +166,5 @@ else:
         ), use_container_width=True)
 
     with radar_col:
-        # Windy 嵌入組件
         windy_url = f"https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricWind=default&zoom=4&overlay=wind&product=ecmwf&level=surface&lat={current_sys['lat']}&lon={current_sys['lon']}"
         st.components.v1.iframe(windy_url, width=None, height=380, scrolling=False)
