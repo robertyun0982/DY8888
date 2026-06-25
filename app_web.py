@@ -158,11 +158,10 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 🎯 中間 Pydeck 地圖區：改為不需要 Token 也能百分之百顯影的 "road" 樣式
+        # 中間 Pydeck 地圖區 (穩定顯影版)
         df_circles = pd.DataFrame(current_sys["circles"])
         df_paths = pd.DataFrame(current_sys["paths"])
         
-        # 標註台灣與屏東防禦點的 DataFrame
         df_poi = pd.DataFrame([
             {"lon": TW_LON, "lat": TW_LAT, "name": "TAIWAN", "color": [0, 102, 204, 200], "size": 30000},
             {"lon": PT_LON, "lat": PT_LAT, "name": "屏東防禦點", "color": [225, 29, 72, 255], "size": 18000}
@@ -176,7 +175,7 @@ with left_main_col:
         ]
         
         st.pydeck_chart(pdk.Deck(
-            map_style="road",  # ⚡ 修正：改用路網地圖，確保背景圖資與紅框絕對不會消失
+            map_style="road",
             initial_view_state=pdk.ViewState(latitude=current_sys["map_view"]["lat"], longitude=current_sys["map_view"]["lon"], zoom=current_sys["map_view"]["zoom"]),
             layers=layers
         ), use_container_width=True)
@@ -196,13 +195,13 @@ with left_main_col:
         st.dataframe(df_pingtung_trend, hide_index=True, use_container_width=True)
 
 with right_summary_col:
-    # 🎯 修正處：最右側「勇式總結」回歸純粹的颱風、屏東雨情災情研判結論
+    # 最右側戰情總結
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid #f59e0b; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
         <div style="font-size: 17px; font-weight: bold; color: #f59e0b; margin-bottom: 12px;">📊 勇式總結</div>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:10px;">
         <b>① 颱風侵台概率評估：</b><br>
-        目前監測之颱風系統中心位於台灣東南方海面，綜合世界七大氣象機構（包括我國中央氣象署 CWA、歐洲中期預報 ECMWF 等）最新路徑概算，侵台均值概率僅為 <b>{avg_prob}%</b>。路徑明確偏東朝日本南方海面移動，對台灣陸地無直接威脅，防汛單位可暫時解除路徑警報。
+        目前監測之颱風系統中心位於台灣東南方海面，綜合世界七大氣象機構最新路徑概算，侵台均值概率僅為 <b>{avg_prob}%</b>。路徑明確偏東朝日本南方海面移動，對台灣陸地無直接威脅，防汛單位可暫時解除路徑警報。
         </p>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:10px;">
         <b>② 屏東縣劇烈雨情警戒：</b><br>
@@ -215,7 +214,7 @@ with right_summary_col:
         未來5日分區降雨趨勢顯示，劇烈對流將持續影響至6/26（五），直到6/27（六）過後雨勢才會逐漸趨緩。防汛指揮官應將抽水機組與人員重心全面鎖定在「本地對流防禦」，切勿因颱風遠離而放鬆抽水部署。
         </p>
         <div style="font-size:11px; color:#64748b; border-top:1px solid #1f2937; padding-top:8px; text-align:right; margin-top:20px;">
-            ⚡ 戰情整點發布：{current_hour:02d}時{current_min:02d}分
+            ⚡ 勇式整點發布：目前台灣時間 {current_hour:02d}時{current_min:02d}分
         </div>
     </div>
     """, unsafe_allow_html=True)
