@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import math
-import time
+from datetime import datetime, timedelta
 
 # 1. 網頁基礎設定
 st.set_page_config(page_title="勇式颱風侵台概率暨屏東縣降雨監測", page_icon="⚡", layout="wide")
@@ -67,10 +67,11 @@ st.markdown("""
 # 核心主標題 (原生不切字)
 st.title("⚡ 勇式颱風侵台概率暨屏東縣降雨監測")
 
-# --- 🎯 3. 動態時間與降雨振幅機制 ---
-lt = time.localtime()
-current_hour = lt.tm_hour
-current_min = lt.tm_min
+# --- 🎯 3. 強制校對台灣時間 (UTC+8) 與降雨動態機制 ---
+# 取出伺服器 UTC 時間並強制加上 8 小時，對齊台灣標準時間
+tw_time = datetime.utcnow() + timedelta(hours=8)
+current_hour = tw_time.hour
+current_min = tw_time.minute
 dynamic_wave = round(math.sin(current_min / 10.0) * 0.1, 2)
 
 # --- 🌧️ 屏東地方氣象數據庫 ---
