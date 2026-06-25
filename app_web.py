@@ -268,4 +268,18 @@ with right_summary_col:
         <b>① 颱風侵台概率評估：</b><br>
         目前透過 API 追蹤西北太平洋颱風系統，綜合世界七大氣象機構最新路徑概算，侵台均值概率為 <b>{avg_prob}%</b>。目前大趨勢路徑對台灣本島陸地無直接突發威脅，防汛指揮官可維持常態監控。
         </p>
-        <p style="font-size:
+        <p style="font-size:13.5px; line-height:1.6; margin-bottom:10px;">
+        <b>② 屏東縣即時雨情警戒（真實連線）：</b><br>
+        根據氣象署最新氣象觀測站傳回數據，屏東地方受即時雲系與對流移入影響：<br>
+        • <b>平地區域</b>：未來 24H 累積雨量預估來到 <b>{m_p24}</b>。低窪市區雨水下水道防禦需保持暢通。<br>
+        • <b>山區區域</b>：未來 24H 累積雨量預估來到 <b>{m_m24}</b>。山區土壤含水量隨觀測數據變動中，需防範土石鬆動。
+        </p>
+        <p style="font-size:13.5px; line-height:1.6;">
+        <b>③ 防汛調度核心建議：</b><br>
+        下方「降雨概率與氣象預報」資料表已與氣象署總部雲端同步。後續如有劇烈雷雨胞或暴雨侵襲屏東，數值與警告說明將會隨氣象局發布公告而自動即時抽換，請依據最新即時跳動數據調配防汛抽水機組。
+        </p>
+        <div style="font-size:11px; color:#64748b; border-top:1px solid #1f2937; padding-top:8px; text-align:right; margin-top:20px;">
+            ⚡ 勇式整點發布：目前台灣時間 {current_hour:02d}時{current_min:02d}分
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
