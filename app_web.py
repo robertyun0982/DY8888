@@ -68,7 +68,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🎯 修正處 1：改回您指定的專屬主標題名稱
+# 主標題維持不變
 st.title("⚡ 勇式防颱防汛天地")
 
 # --- 🎯 3. 強制校對台灣時間 (UTC+8) ---
@@ -77,19 +77,25 @@ current_hour = tw_time.hour
 current_min = tw_time.minute
 dynamic_wave = round(math.sin(current_min / 10.0) * 0.1, 2)
 
+# 🎯 動態推算真實日期標籤 (例如：6/25 白天)
+d0 = tw_time.strftime("%m/%d")
+d1 = (tw_time + timedelta(days=1)).strftime("%m/%d")
+d2 = (tw_time + timedelta(days=2)).strftime("%m/%d")
+d3 = (tw_time + timedelta(days=3)).strftime("%m/%d")
+time_labels = [f"{d0} 白天", f"{d0} 晚上", f"{d1} 全天", f"{d2} 全天", f"{d3} 全天"]
+
 # --- 🌐 4. 中央氣象署 API 真實資料即時動態抓取 ---
 @st.cache_data(ttl=600)
-def fetch_cwa_data(token):
+def fetch_cwa_data(token, labels):
     backup_rain = {"p12": "110 mm", "p24": "180 mm", "m12": "160 mm", "m24": "290 mm"}
-    # 🎯 修正處 2：預設預報時段文字完全改回指定的日期稱呼
-    time_labels = ["今日白天", "今日晚上", "明天全天", "後天全天", "大後天全天"]
     
+    # 🎯 修正處：將預設與抓取出的時段欄位全面改為「月/日 + 時段」格式
     backup_trend = [
-        {"預報時段": time_labels[0], "平地機率": "90% 🔴", "山區機率": "95% 🔴", "中央氣象署說明": "持續防局地大豪雨"},
-        {"預報時段": time_labels[1], "平地機率": "75% 🔴", "山區機率": "85% 🔴", "中央氣象署說明": "西南風輸送雷雨胞"},
-        {"預報時段": time_labels[2], "平地機率": "60% 🟡", "山區機率": "70% 🔴", "中央氣象署說明": "午後易有局地強降雨"},
-        {"預報時段": time_labels[3], "平地機率": "45% 🟢", "山區機率": "60% 🟡", "中央氣象署說明": "山區仍有短暫陣雨"},
-        {"預報時段": time_labels[4], "平地機率": "35% 🟢", "山區機率": "50% 🟡", "中央氣象署說明": "局部陣雨或雷雨"}
+        {"預報時段": labels[0], "平地機率": "90% 🔴", "山區機率": "95% 🔴", "中央氣象署說明": "持續防局地大豪雨"},
+        {"預報時段": labels[1], "平地機率": "75% 🔴", "山區機率": "85% 🔴", "中央氣象署說明": "西南風輸送雷雨胞"},
+        {"預報時段": labels[2], "平地機率": "60% 🟡", "山區機率": "70% 🔴", "中央氣象署說明": "午後易有局地強降雨"},
+        {"預報時段": labels[3], "平地機率": "45% 🟢", "山區機率": "60% 🟡", "中央氣象署說明": "山區仍有短暫陣雨"},
+        {"預報時段": labels[4], "平地機率": "35% 🟢", "山區機率": "50% 🟡", "中央氣象署說明": "局部陣雨或雷雨"}
     ]
     backup_typhoon_prob = 1.1
 
@@ -134,9 +140,9 @@ def fetch_cwa_data(token):
             icon_p = "🚨" if prob_p_val >= 90 else ("🔴" if prob_p_val >= 70 else ("🟡" if prob_p_val >= 50 else "🟢"))
             icon_m = "🚨" if prob_m_val >= 90 else ("🔴" if prob_m_val >= 70 else ("🟡" if prob_m_val >= 50 else "🟢"))
             
-            # 🎯 修正處 3：在生成表格時，強制將「預報時段」的欄位值帶入您指定的文字
+            # 將動態推算好的日期標籤帶入表格
             trend_list.append({
-                "預報時段": time_labels[i],
+                "預報時段": labels[i],
                 "平地機率": f"{prob_p_val}% {icon_p}",
                 "山區機率": f"{prob_m_val}% {icon_m}",
                 "中央氣象署說明": desc
@@ -153,7 +159,7 @@ def fetch_cwa_data(token):
         return backup_rain, backup_trend, backup_typhoon_prob
 
 # 執行真實聯網資料抓取
-cwa_rain, cwa_trend, cwa_base_prob = fetch_cwa_data(CWA_TOKEN)
+cwa_rain, cwa_trend, cwa_base_prob = fetch_cwa_data(CWA_TOKEN, time_labels)
 
 m_p12, m_p24 = cwa_rain["p12"], cwa_rain["p24"]
 m_m12, m_m24 = cwa_rain["m12"], cwa_rain["m24"]
