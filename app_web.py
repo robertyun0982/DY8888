@@ -6,9 +6,9 @@ import requests
 from datetime import datetime, timedelta
 
 # 1. 網頁基礎設定
-st.set_page_config(page_title="勇式颱風侵台概率暨屏東縣降雨監測", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="勇式防颱防汛天地", page_icon="⚡", layout="wide")
 
-# 填入您申請的中央氣象署 API Token
+# 中央氣象署 API Token
 CWA_TOKEN = "CWA-21A6E335-B671-4A06-82CC-1AD7B103CEF5"
 
 # 台灣地理中心點與屏東縣基準座標
@@ -68,8 +68,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 核心主標題 (原生不切字)
-st.title("⚡ 勇式颱風侵台概率暨屏東縣降雨監測")
+# 🎯 修正處 1：改回您指定的專屬主標題名稱
+st.title("⚡ 勇式防颱防汛天地")
 
 # --- 🎯 3. 強制校對台灣時間 (UTC+8) ---
 tw_time = datetime.utcnow() + timedelta(hours=8)
@@ -78,46 +78,43 @@ current_min = tw_time.minute
 dynamic_wave = round(math.sin(current_min / 10.0) * 0.1, 2)
 
 # --- 🌐 4. 中央氣象署 API 真實資料即時動態抓取 ---
-@st.cache_data(ttl=600)  # 每 10 分鐘自動在背景快取刷新真實資料，不卡網頁速度
+@st.cache_data(ttl=600)
 def fetch_cwa_data(token):
-    # 預設極端天氣備份資料（萬一氣象署 API 斷線或維護時防跑版）
     backup_rain = {"p12": "110 mm", "p24": "180 mm", "m12": "160 mm", "m24": "290 mm"}
+    # 🎯 修正處 2：預設預報時段文字完全改回指定的日期稱呼
+    time_labels = ["今日白天", "今日晚上", "明天全天", "後天全天", "大後天全天"]
+    
     backup_trend = [
-        {"預報時段": "今日白天", "平地機率": "90% 🔴", "山區機率": "95% 🔴", "中央氣象署說明": "持續防局地大豪雨"},
-        {"預報時段": "今日晚上", "平地機率": "75% 🔴", "山區機率": "85% 🔴", "中央氣象署說明": "西南風輸送雷雨胞"},
-        {"預報時段": "明天全天", "平地機率": "60% 🟡", "山區機率": "70% 🔴", "中央氣象署說明": "午後易有局地強降雨"},
-        {"預報時段": "後天全天", "平地機率": "45% 🟢", "山區機率": "60% 🟡", "中央氣象署說明": "山區仍有短暫陣雨"},
-        {"預報時段": "大後天全天", "平地機率": "35% 🟢", "山區機率": "50% 🟡", "中央氣象署說明": "局部陣雨或雷雨"}
+        {"預報時段": time_labels[0], "平地機率": "90% 🔴", "山區機率": "95% 🔴", "中央氣象署說明": "持續防局地大豪雨"},
+        {"預報時段": time_labels[1], "平地機率": "75% 🔴", "山區機率": "85% 🔴", "中央氣象署說明": "西南風輸送雷雨胞"},
+        {"預報時段": time_labels[2], "平地機率": "60% 🟡", "山區機率": "70% 🔴", "中央氣象署說明": "午後易有局地強降雨"},
+        {"預報時段": time_labels[3], "平地機率": "45% 🟢", "山區機率": "60% 🟡", "中央氣象署說明": "山區仍有短暫陣雨"},
+        {"預報時段": time_labels[4], "平地機率": "35% 🟢", "山區機率": "50% 🟡", "中央氣象署說明": "局部陣雨或雷雨"}
     ]
     backup_typhoon_prob = 1.1
 
     try:
-        # A. 抓取屏東真實即時雨量 (O-A0002-001 自動氣象站)
+        # A. 抓取屏東真實即時雨量
         rain_url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0002-001?Authorization={token}&CountyName=%E5%B1%8F%E6%9D%B1%E7%B8%A3"
         r_res = requests.get(rain_url, timeout=5).json()
         stations = r_res['records']['Station']
         
-        # 篩選屏東市(平地)與泰武/三地門(山區)一帶真實雨量
         p_r = [s['WeatherElement']['Now']['Precipitation'] for s in stations if s['GeoInfo']['TownName'] in ['屏東市', '萬丹鄉', '潮州鎮']]
         m_r = [s['WeatherElement']['Now']['Precipitation'] for s in stations if s['GeoInfo']['TownName'] in ['泰武鄉', '三地門鄉', '霧臺鄉']]
         
         real_p = max(p_r) if p_r else 15.0
         real_m = max(m_r) if m_r else 32.0
         
-        # 轉化為戰情面板累積預估值
         rain_data = {
-            "p12": f"{int(real_p * 4 + 40)} mm",
-            "p24": f"{int(real_p * 7 + 80)} mm",
-            "m12": f"{int(real_m * 4 + 60)} mm",
-            "m24": f"{int(real_m * 7 + 120)} mm"
+            "p12": f"{int(real_p * 4 + 40)} mm", "p24": f"{int(real_p * 7 + 80)} mm",
+            "m12": f"{int(real_m * 4 + 60)} mm", "m24": f"{int(real_m * 7 + 120)} mm"
         }
 
-        # B. 抓取屏東5日真實預報 (F-D0047-035 屏東縣未來雙日與一週預報)
+        # B. 抓取屏東5日真實預報
         forecast_url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-035?Authorization={token}&elementName=PoP12h,WeatherDescription"
         f_res = requests.get(forecast_url, timeout=5).json()
         locations = f_res['records']['Locations'][0]['Location']
         
-        # 平地(屏東市)與山區(瑪家鄉)真實聯動
         plain_loc = [l for l in locations if l['LocationName'] == "屏東市"][0]
         m_loc = [l for l in locations if l['LocationName'] == "瑪家鄉"][0]
         
@@ -127,7 +124,6 @@ def fetch_cwa_data(token):
         
         trend_list = []
         for i in range(min(5, len(p_pop))):
-            t_name = p_pop[i]['StartTime'][5:16].replace("-", "/")
             prob_p = p_pop[i]['ElementValue'][0]['ProbabilityOfPrecipitation']
             prob_m = m_pop[i]['ElementValue'][0]['ProbabilityOfPrecipitation']
             desc = p_desc[i]['ElementValue'][0]['WeatherDescription'].split('。')[0]
@@ -138,18 +134,19 @@ def fetch_cwa_data(token):
             icon_p = "🚨" if prob_p_val >= 90 else ("🔴" if prob_p_val >= 70 else ("🟡" if prob_p_val >= 50 else "🟢"))
             icon_m = "🚨" if prob_m_val >= 90 else ("🔴" if prob_m_val >= 70 else ("🟡" if prob_m_val >= 50 else "🟢"))
             
+            # 🎯 修正處 3：在生成表格時，強制將「預報時段」的欄位值帶入您指定的文字
             trend_list.append({
-                "預報時段": t_name,
+                "預報時段": time_labels[i],
                 "平地機率": f"{prob_p_val}% {icon_p}",
                 "山區機率": f"{prob_m_val}% {icon_m}",
                 "中央氣象署說明": desc
             })
             
-        # C. 檢查有無即時颱風警報 (W-C0034-001)
+        # C. 檢查有無即時颱風警報
         ty_url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/W-C0034-001?Authorization={token}"
         ty_res = requests.get(ty_url, timeout=5).json()
         if 'records' in ty_res and 'Typhoon' in ty_res['records'] and ty_res['records']['Typhoon']:
-            backup_typhoon_prob = 45.0  # 若發布警報，主動拉高威脅機率
+            backup_typhoon_prob = 45.0
             
         return rain_data, trend_list, backup_typhoon_prob
     except:
@@ -162,7 +159,7 @@ m_p12, m_p24 = cwa_rain["p12"], cwa_rain["p24"]
 m_m12, m_m24 = cwa_rain["m12"], cwa_rain["m24"]
 df_pingtung_trend = pd.DataFrame(cwa_trend)
 
-# --- 🌀 5. 颱風動態模組（與真實 CWA 狀態即時權重連動） ---
+# --- 🌀 5. 颱風動態模組 ---
 cwa_live_prob = max(0.0, round(cwa_base_prob + dynamic_wave, 1))
 
 REAL_TIME_DATA = [
@@ -217,7 +214,6 @@ with left_main_col:
     list_col, map_col, data_col = st.columns([13, 52, 35], gap="small")
     
     with list_col:
-        # 左側7國概率
         prob_html = "".join([f'<div class="prob-row"><span class="prob-label">{p["name"]}</span><span style="color:#4ade80; font-size:11.5px;">{p["prob"]}%</span></div>' for p in current_sys["base_probs"]])
         st.markdown(f"""
         <div class="sidebar-prob-container">
@@ -231,7 +227,6 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 中間 Pydeck 地圖區 (穩定顯影版)
         df_circles = pd.DataFrame(current_sys["circles"])
         df_paths = pd.DataFrame(current_sys["paths"])
         
@@ -254,7 +249,6 @@ with left_main_col:
         ), use_container_width=True)
 
     with data_col:
-        # 右側面板 1：12H/24H 累積雨量看板（API 真實連動）
         st.markdown('<div style="font-size:13px; font-weight:bold; color:#38bdf8; margin-bottom:5px;">📍 屏東縣雨量防汛面板 (API 連線中)</div>', unsafe_allow_html=True)
         
         df_metrics = pd.DataFrame([
@@ -263,12 +257,10 @@ with left_main_col:
         ])
         st.dataframe(df_metrics, hide_index=True, use_container_width=True)
         
-        # 右側面板 2：5日分區降雨趨勢（API 真實連動）
         st.markdown('<div style="font-size:13px; font-weight:bold; color:#ffffff; background-color:#1e293b; padding:4px 8px; border-left:4px solid #ef4444; margin-top:15px; margin-bottom:5px;">📅 屏東真實降雨概率與氣象預報</div>', unsafe_allow_html=True)
         st.dataframe(df_pingtung_trend, hide_index=True, use_container_width=True)
 
 with right_summary_col:
-    # 最右側戰情總結
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid #f59e0b; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
         <div style="font-size: 17px; font-weight: bold; color: #f59e0b; margin-bottom: 12px;">📊 勇式總結</div>
@@ -276,18 +268,4 @@ with right_summary_col:
         <b>① 颱風侵台概率評估：</b><br>
         目前透過 API 追蹤西北太平洋颱風系統，綜合世界七大氣象機構最新路徑概算，侵台均值概率為 <b>{avg_prob}%</b>。目前大趨勢路徑對台灣本島陸地無直接突發威脅，防汛指揮官可維持常態監控。
         </p>
-        <p style="font-size:13.5px; line-height:1.6; margin-bottom:10px;">
-        <b>② 屏東縣即時雨情警戒（真實連線）：</b><br>
-        根據氣象署最新氣象觀測站傳回數據，屏東地方受即時雲系與對流移入影響：<br>
-        • <b>平地區域</b>：未來 24H 累積雨量預估來到 <b>{m_p24}</b>。低窪市區雨水下水道防禦需保持暢通。<br>
-        • <b>山區區域</b>：未來 24H 累積雨量預估來到 <b>{m_m24}</b>。山區土壤含水量隨觀測數據變動中，需防範土石鬆動。
-        </p>
-        <p style="font-size:13.5px; line-height:1.6;">
-        <b>③ 防汛調度核心建議：</b><br>
-        下方「降雨概率與氣象預報」資料表已與氣象署總部雲端同步。後續如有劇烈雷雨胞或暴雨侵襲屏東，數值與警告說明將會隨氣象局發布公告而自動即時抽換，請依據最新即時跳動數據調配防汛抽水機組。
-        </p>
-        <div style="font-size:11px; color:#64748b; border-top:1px solid #1f2937; padding-top:8px; text-align:right; margin-top:20px;">
-            ⚡ 勇式整點發布：目前台灣時間 {current_hour:02d}時{current_min:02d}分
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        <p style="font-size:
