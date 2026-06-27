@@ -3,12 +3,22 @@ import pandas as pd
 import pydeck as pdk
 import math
 import requests
+import time
 from datetime import datetime, timedelta
 
 # 1. 網頁基礎設定
 st.set_page_config(page_title="勇式防災網", page_icon="⚡", layout="wide")
 
-# 金鑰對接 (隱藏技術名詞)
+# --- 🔄 網頁畫面每 4 小時自動全網頁重新整理機制 ---
+@st.fragment
+def auto_refresh_page(seconds=14400):
+    time.sleep(seconds)
+    st.rerun()
+
+# 啟動網頁自動監聽
+auto_refresh_page()
+
+# 金鑰對接
 CWA_TOKEN = "CWA-21A6E335-B671-4A06-82CC-1AD7B103CEF5"
 
 # 台灣地理中心點與屏東縣基準座標
@@ -79,7 +89,7 @@ dynamic_wave = round(math.sin(current_min / 10.0) * 0.1, 2)
 # --- 🌐 4. 數據即時動態抓取核心 ---
 @st.cache_data(ttl=14400)
 def fetch_cwa_data(token):
-    # 建立動態模擬降雨機制，確保無重大災害時，數據依然天天有真實起伏
+    # 建立動態模擬降雨機制
     backup_rain = {"p12": "5 mm", "p24": "12 mm", "m12": "18 mm", "m24": "35 mm"}
     
     backup_trend = []
@@ -193,6 +203,10 @@ m_p12, m_p24 = cwa_rain["p12"], cwa_rain["p24"]
 m_m12, m_m24 = cwa_rain["m12"], cwa_rain["m24"]
 df_pingtung_trend = pd.DataFrame(cwa_trend)
 
+# 提取純數字供邏輯判斷使用
+val_p24 = int(m_p24.replace(" mm", ""))
+val_m24 = int(m_m24.replace(" mm", ""))
+
 # --- 🌀 5. 颱風動態模組 ---
 cwa_live_prob = max(0.0, round(cwa_base_prob + dynamic_wave, 1))
 
@@ -273,23 +287,40 @@ with left_main_col:
         st.dataframe(df_pingtung_trend, hide_index=True, use_container_width=True)
 
 with right_summary_col:
-    # 🎯 最終校正：完全依據侵台、平地/山區雨量進行業務總結，無程式內部技術用詞
+    # 🎯 核心修正：讓程式碼根據即時變數，自動判斷並動態產生總結文字
+    # 1. 侵台判定邏輯
+    if avg_prob == 0.0:
+        ty_summary_text = "目前西北太平洋及台灣周邊海域大氣結構平穩，無任何熱帶低壓或氣旋威脅痕跡，侵台綜合評估均值機率已安全<b>歸零（0.0%）</b>。"
+    elif avg_prob < 30.0:
+        ty_summary_text = f"目前外海有低壓擾動，綜合氣象局機構計算侵台機率為 <b>{avg_prob}%</b>，屬於低度戒備狀態，對本島暫無直接突發威脅。"
+    else:
+        ty_summary_text = f"⚠️ 警告：熱帶氣旋威脅逼近！七大機構綜合概算侵台機率已上升至 <b>{avg_prob}%</b>，請高度戒備。"
+
+    # 2. 雨量判定邏輯
+    if val_p24 <= 50 and val_m24 <= 80:
+        rain_summary_text = f"各地雨勢顯著消退，回歸季節常態環境：<br>• <b>平地區域</b>：24H預估累積雨量僅 <b>{m_p24}</b>，市區無任何積淹水風險。<br>• <b>山區區域</b>：24H預估累積雨量為 <b>{m_m24}</b>，屬於正常午後局部對流，邊坡土壤安全。"
+        action_summary_text = "鑑於熱帶氣旋威脅解除且平地與山區雨勢穩定安全，各防汛防禦點停止天氣應變，防汛抽水機組與應變人員即刻解除待命狀態，回歸常態巡檢機制。"
+        border_color = "#38bdf8"
+    else:
+        rain_summary_text = f"⚠️ 注意：監測到局部對流發展或外圍環流移入：<br>• <b>平地區域</b>：24H預估累積雨量達 <b>{m_p24}</b>，請留意易淹水低窪處。<br>• <b>山區區域</b>：24H預估累積雨量達 <b>{m_m24}</b>，山區土石含水量高。"
+        action_summary_text = "因應雨量累積攀升，各重要防禦節點抽水機組應保持熱機或進駐特定低窪點，防汛人員轉為機動待命，密切監控下水道排水水位。"
+        border_color = "#ef4444"
+
+    # 輸出自動生成的 HTML 區塊
     st.markdown(f"""
-    <div style="background-color: #0f172a; border-top: 4px solid #38bdf8; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
-        <div style="font-size: 17px; font-weight: bold; color: #38bdf8; margin-bottom: 12px;">📊 勇式總結</div>
+    <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
+        <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 12px;">📊 勇式總結</div>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:10px;">
         <b>① 颱風侵台概率評估：</b><br>
-        目前西北太平洋及台灣周邊海域大氣結構平穩，無熱帶低壓或氣旋威脅痕跡，侵台綜合評估均值機率已安全<b>歸零（0.0%）</b>。
+        {ty_summary_text}
         </p>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:10px;">
         <b>② 屏東縣即時雨情警戒：</b><br>
-        前日劇烈降雨已全面消退，各觀測站回報大氣回歸常態：<br>
-        • <b>平地區域</b>：24H 預估累積雨量僅 <b>{m_p24}</b>，市區及低窪處無積淹水風險。<br>
-        • <b>山區區域</b>：24H 預估累積雨量為 <b>{m_m24}</b>，屬於正常午後局部對流範圍，土壤含水量與邊坡係數安全。
+        {rain_summary_text}
         </p>
         <p style="font-size:13.5px; line-height:1.6;">
         <b>③ 防汛調度核心建議：</b><br>
-        鑑於熱帶氣旋威脅全面解除，且平地與山區整體雨勢顯著趨緩，各防汛防禦點可停止極端天氣應變，防汛抽水機組及各級應變值班人員即刻解除待命狀態，回歸常態巡檢機制。
+        {action_summary_text}
         </p>
         <div style="font-size:11px; color:#64748b; border-top:1px solid #1f2937; padding-top:8px; text-align:right; margin-top:20px;">
             ⚡ 勇式整點發布：目前台灣時間 {current_hour:02d}時{current_min:02d}分
