@@ -9,15 +9,6 @@ from datetime import datetime, timedelta
 # 1. 網頁基礎設定
 st.set_page_config(page_title="勇式防災網", page_icon="⚡", layout="wide")
 
-# --- 🔄 網頁畫面每 4 小時自動全網頁重新整理機制 ---
-@st.fragment
-def auto_refresh_page(seconds=14400):
-    time.sleep(seconds)
-    st.rerun()
-
-# 啟動網頁自動監聽
-auto_refresh_page()
-
 # 金鑰對接
 CWA_TOKEN = "CWA-21A6E335-B671-4A06-82CC-1AD7B103CEF5"
 
@@ -287,8 +278,7 @@ with left_main_col:
         st.dataframe(df_pingtung_trend, hide_index=True, use_container_width=True)
 
 with right_summary_col:
-    # 🎯 核心修正：讓程式碼根據即時變數，自動判斷並動態產生總結文字
-    # 1. 侵台判定邏輯
+    # 根據即時變數，自動判斷並動態產生總結文字
     if avg_prob == 0.0:
         ty_summary_text = "目前西北太平洋及台灣周邊海域大氣結構平穩，無任何熱帶低壓或氣旋威脅痕跡，侵台綜合評估均值機率已安全<b>歸零（0.0%）</b>。"
     elif avg_prob < 30.0:
@@ -296,7 +286,6 @@ with right_summary_col:
     else:
         ty_summary_text = f"⚠️ 警告：熱帶氣旋威脅逼近！七大機構綜合概算侵台機率已上升至 <b>{avg_prob}%</b>，請高度戒備。"
 
-    # 2. 雨量判定邏輯
     if val_p24 <= 50 and val_m24 <= 80:
         rain_summary_text = f"各地雨勢顯著消退，回歸季節常態環境：<br>• <b>平地區域</b>：24H預估累積雨量僅 <b>{m_p24}</b>，市區無任何積淹水風險。<br>• <b>山區區域</b>：24H預估累積雨量為 <b>{m_m24}</b>，屬於正常午後局部對流，邊坡土壤安全。"
         action_summary_text = "鑑於熱帶氣旋威脅解除且平地與山區雨勢穩定安全，各防汛防禦點停止天氣應變，防汛抽水機組與應變人員即刻解除待命狀態，回歸常態巡檢機制。"
@@ -306,7 +295,6 @@ with right_summary_col:
         action_summary_text = "因應雨量累積攀升，各重要防禦節點抽水機組應保持熱機或進駐特定低窪點，防汛人員轉為機動待命，密切監控下水道排水水位。"
         border_color = "#ef4444"
 
-    # 輸出自動生成的 HTML 區塊
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
         <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 12px;">📊 勇式總結</div>
@@ -327,3 +315,12 @@ with right_summary_col:
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+# --- 🔄 5. 畫面自動更新容器 (放在程式碼最後端，不阻礙初始加載) ---
+# 這樣一來網頁開啟時會直接秒開，4小時到了才會觸發底層的整頁刷新
+@st.fragment
+def auto_refresh_scheduler(seconds=14400):
+    time.sleep(seconds)
+    st.rerun()
+
+auto_refresh_scheduler()
