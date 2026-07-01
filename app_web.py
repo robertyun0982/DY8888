@@ -318,3 +318,28 @@ with right_summary_col:
         <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 15px;">📊 勇式生活防災總結</div>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
         <b>① 颱風影響機率與防範：</b><br>
+        {ty_summary_text}<br>
+        👉 <i>{ty_action_text}</i>
+        </p>
+        <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
+        <b>② 即時溫度防護指引：</b><br>
+        {temp_summary_text}
+        </p>
+        <p style="font-size:13.5px; line-height:1.6;">
+        <b>③ 降雨現況與雨天安全提醒：</b><br>
+        {rain_summary_text}<br>
+        👉 <i>{rain_action_text}</i>
+        </p>
+        <div style="font-size:11px; color:#64748b; border-top:1px solid #1f2937; padding-top:8px; text-align:right; margin-top:20px;">
+            ⚡ 勇式最新發布時間：台灣時間 {current_hour:02d}點{current_min:02d}分
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- 🔄 7. 畫面自動更新容器 (後置計時，不阻礙初始流暢加載) ---
+@st.fragment
+def auto_refresh_scheduler(seconds=14400):
+    time.sleep(seconds)
+    st.rerun()
+
+auto_refresh_scheduler()
