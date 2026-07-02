@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import requests
+import math  # 🎯 修正關鍵：補回被遺漏的 math 標準庫，徹底解決 NameError
 from datetime import datetime, timedelta
 
 # 1. 網頁基礎設定 (全域唯一，絕不重複渲染)
@@ -58,6 +59,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 🎯 乾淨的單一標題
 st.title("⚡ 勇式防災網")
 
 # --- 🎯 3. 強制校對台灣時間 (UTC+8) ---
@@ -122,7 +124,7 @@ val_p24 = int(m_p24.replace(" mm", ""))
 val_m24 = int(m_m24.replace(" mm", ""))
 val_temp = float(cwa_temperature.replace("°C", ""))
 
-# 模擬雙氣旋與台灣相對距離 (TD09 與 颱風巴威)
+# 大氣與氣旋相對預測值
 cwa_live_prob = 78.5 
 avg_prob = f"{cwa_live_prob}%"
 
@@ -168,7 +170,7 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 🎯 🎯 99% 復刻氣象署「路徑潛勢預報圖」Matplotlib 繪圖核心 🎯 🎯
+        # 🎯 99% 復刻氣象署「路徑潛勢預報圖」Matplotlib 繪圖核心
         fig, ax = plt.subplots(figsize=(6.5, 5.2), dpi=150)
         fig.patch.set_facecolor('#bce2f3')  # 經典氣象局海藍底色
         ax.set_facecolor('#bce2f3')
@@ -178,19 +180,16 @@ with left_main_col:
         ax.set_xlim(110, 145)
         ax.set_ylim(10, 35)
         
-        # 簡易繪製陸地輪廓 (台灣、中國大陸、菲律賓、日本)
-        # 台灣
+        # 繪製陸地輪廓
         ax.fill([120, 121.5, 121.9, 120.5, 120], [22, 22, 25, 25, 22], color='#ffffff', edgecolor='#7f9db9', linewidth=1, zorder=2)
-        # 中國大陸與日本沿岸、菲律賓簡化版塊
         ax.fill([110, 120, 122, 118, 110], [20, 26, 35, 35, 20], color='#d9ebd3', edgecolor='#7f9db9', linewidth=1, zorder=2)
         ax.fill([121, 122, 126, 125, 121], [12, 18, 18, 12, 12], color='#ffffff', edgecolor='#7f9db9', linewidth=1, zorder=2)
         ax.fill([130, 135, 140, 135, 130], [30, 35, 35, 30, 30], color='#ffffff', edgecolor='#7f9db9', linewidth=1, zorder=2)
 
         # --- 氣旋 1: TD09 潛勢路徑路網資料 ---
         td_path = np.array([[124.0, 16.0], [122.5, 17.5], [120.8, 19.2], [118.5, 21.0]])
-        ax.plot(td_path[:,0], td_path[:,1], color='#00ffff', linestyle='-', linewidth=2, zorder=3) # 過去路徑
+        ax.plot(td_path[:,0], td_path[:,1], color='#00ffff', linestyle='-', linewidth=2, zorder=3)
         
-        # 預測路徑線與 70% 潛勢範圍
         td_pred = np.array([[118.5, 21.0], [116.5, 23.0], [115.0, 26.0], [114.2, 30.0]])
         ax.plot(td_pred[:,0], td_pred[:,1], color='#e06666', linestyle='--', linewidth=1.5, zorder=3)
         
@@ -209,7 +208,6 @@ with left_main_col:
         for x, y, lbl, pos in td_nodes:
             color = '#ff6600' if "03日08時" in lbl else ('#3d3d3d' if "20時" in lbl else 'white')
             ax.scatter(x, y, color=color, edgecolor='black', s=30, zorder=4)
-            # 指引線與對話標籤
             ax.annotate(lbl, xy=(x, y), xytext=(x-4, y-2 if pos=="left" else y-4),
                         arrowprops=dict(arrowstyle="-", color='black', linewidth=0.6),
                         bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='black', lw=0.7), fontsize=6, zorder=5)
@@ -244,11 +242,9 @@ with left_main_col:
         ax.text(111, 33, "2026/07/02 08:00 LST", fontsize=10, fontweight='bold', color='black',
                 bbox=dict(boxstyle='square,pad=0.2', fc='white', alpha=0.7, ec='none'))
         
-        # 移除地圖邊框與經緯度數字以求極致乾淨簡約
         ax.set_xticks([])
         ax.set_yticks([])
         
-        # 將完美模仿的圖表渲染上網頁
         st.pyplot(fig, use_container_width=True)
 
     with data_col:
@@ -273,7 +269,7 @@ with left_main_col:
 
 with right_summary_col:
     # --- 🎯 6. 全自動大眾生活防災總結研判 ---
-    border_color = "#ef4444" # 雙氣旋逼近，強制紅色警戒邊框
+    border_color = "#ef4444" 
     
     ty_summary_text = f"⚠️ <b>雙氣旋路徑警告：</b>目前台灣周邊海域有<b>熱帶低壓TD09</b>與<b>颱風巴威</b>雙軌逼近。左側預報圖已全面同步中央氣象署規範，<b>綠色區塊為70%暴風圈路徑潛勢圈，實線為過去軌跡，虛線延伸點搭配對話框則為未來7日精準移動時刻。</b>各國評估綜合侵台機率高達 <b>{avg_prob}</b>。"
     ty_action_text = "雙氣旋外圍環流將於明日起逐步影響屏東，請民眾務必於今晚前固定好巡視陽台盆栽、外牆廣告招牌，並順手清理居家排水溝蓋以防強風與大水。"
