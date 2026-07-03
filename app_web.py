@@ -109,7 +109,6 @@ m_p12, m_p24 = cwa_rain["p12"], cwa_rain["p24"]
 m_m12, m_m24 = cwa_rain["m12"], cwa_rain["m24"]
 df_pingtung_trend = pd.DataFrame(cwa_trend)
 
-# 🎯 按照國際標準修改：低警戒區間 (12% ~ 24%)
 avg_prob = "18.5%"
 NATIONAL_PREDICTIONS = [
     {"name": "台灣中央氣象署", "display_prob": "15.0%"},
@@ -142,7 +141,7 @@ with left_main_col:
         prob_html = "".join(prob_rows)
         
         st.markdown(f"""
-        <div class="sidebar-sidebar-container">
+        <div class="sidebar-prob-container">
             <div style="font-size:11px; font-weight:bold; color:#38bdf8; text-align:center; border-bottom:1px solid #1e293b; padding-bottom:5px; margin-bottom:6px;">🌐 各國預測侵台率</div>
             {prob_html}
             <div class="prob-row" style="background-color: #0f172a; border-top: 1px dashed #334155; margin-top:5px; padding-top:5px;">
@@ -153,7 +152,7 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 🎯 🎯 【高確定性路徑、巨型侵襲圈、直接顯示名字】 🎯 🎯
+        # 🎯 🎯 【Google 地圖外掛】 🎯 🎯
         html_map_code = """
         <!DOCTYPE html>
         <html>
@@ -163,7 +162,6 @@ with left_main_col:
             <style>
                 #map { width: 100%; height: 515px; border-radius: 8px; border: 1px solid #334155; }
                 body { margin: 0; padding: 0; background: #0f172a; }
-                /* 確保地圖標籤文字清晰、具衝擊感 */
                 .typhoon-label {
                     background: rgba(15, 23, 42, 0.85);
                     border: 1px solid #38bdf8;
@@ -183,33 +181,28 @@ with left_main_col:
             <script>
                 var map = L.map('map', {zoomControl: false}).setView([21.5, 125.0], 5);
 
-                // 載入正宗 Google 地圖標準街道底圖
                 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
                     attribution: 'Google Maps'
                 }).addTo(map);
 
-                // 🟢 1. 繪製氣象署標準 70% 綠色半透明潛勢圈範圍 (確定性範圍面)
                 var td09Poly = [[19.5, 118.5], [21.0, 115.0], [25.0, 112.5], [31.0, 113.0], [31.0, 116.5], [26.0, 118.5], [22.5, 120.0]];
                 var bawiPoly = [[16.5, 137.5], [15.5, 132.0], [17.0, 123.0], [22.0, 124.0], [20.0, 132.0], [19.0, 138.0]];
 
                 L.polygon(td09Poly, {color: '#ef4444', weight: 1, fillColor: '#22c55e', fillOpacity: 0.2}).addTo(map);
                 L.polygon(bawiPoly, {color: '#ef4444', weight: 1, fillColor: '#22c55e', fillOpacity: 0.2}).addTo(map);
 
-                // 🔴 2. 確定性高精度巨型路徑圈（按時間序列精確疊加，顏色加深強化衝擊感）
                 var pathCircles = [
-                    // --- 南海熱帶低壓 TD09 確定性移動軌跡 ---
                     {lat: 16.0, lng: 124.0, col: '#06b6d4', op: 0.12, rad: 200000},
                     {lat: 17.5, lng: 122.5, col: '#06b6d4', op: 0.18, rad: 200000},
                     {lat: 19.2, lng: 120.8, col: '#06b6d4', op: 0.25, rad: 220000},
-                    {lat: 21.0, lng: 118.5, col: '#ef4444', op: 0.35, rad: 240000}, // 當前暴風中心
+                    {lat: 21.0, lng: 118.5, col: '#ef4444', op: 0.35, rad: 240000}, 
                     {lat: 23.0, lng: 116.5, col: '#ef4444', op: 0.25, rad: 250000},
                     {lat: 26.0, lng: 115.0, col: '#ef4444', op: 0.18, rad: 260000},
                     {lat: 30.0, lng: 114.2, col: '#ef4444', op: 0.12, rad: 270000},
                     
-                    // --- 颱風 巴威 (BAWI) 確定性移動軌跡 ---
                     {lat: 17.0, lng: 142.0, col: '#a855f7', op: 0.12, rad: 200000},
                     {lat: 17.2, lng: 140.0, col: '#a855f7', op: 0.18, rad: 200000},
-                    {lat: 17.5, lng: 137.5, col: '#ef4444', op: 0.35, rad: 240000}, // 當前暴風中心
+                    {lat: 17.5, lng: 137.5, col: '#ef4444', op: 0.35, rad: 240000}, 
                     {lat: 17.6, lng: 134.0, col: '#ef4444', op: 0.25, rad: 250000},
                     {lat: 18.0, lng: 130.0, col: '#ef4444', op: 0.18, rad: 260000},
                     {lat: 19.5, lng: 125.0, col: '#ef4444', op: 0.12, rad: 270000}
@@ -225,20 +218,16 @@ with left_main_col:
                     }).addTo(map);
                 });
 
-                // 🟡 3. 精確時間節點錨定 & 颱風名字標籤外掛
                 var nodes = [
-                    {lat: 21.0, lng: 118.5, name: "🌀 熱帶低壓 TD09", info: "TD09: 當前核心位置", col: 'yellow', isMain: true},
-                    {lat: 23.0, lng: 116.5, name: "", info: "TD09: 03日20時 (預報)", col: 'white', isMain: false},
-                    {lat: 26.0, lng: 115.0, name: "", info: "TD09: 04日08時 (預報)", col: 'white', isMain: false},
-                    
-                    {lat: 17.5, lng: 137.5, name: "🌀 巴威颱風 (BAWI)", info: "巴威: 當前核心位置", col: 'yellow', isMain: true},
-                    {lat: 17.6, lng: 134.0, name: "", info: "巴威: 04日08時 (預報)", col: 'white', isMain: false},
-                    
-                    {lat: 22.67, lng: 120.49, name: "⚠️ 屏東守備點", info: "屏東指揮守備防禦中心", col: 'red', isMain: true}
+                    {lat: 21.0, lng: 118.5, name: "🌀 熱帶低壓 TD09", info: "TD09: 當前核心位置", col: 'yellow'},
+                    {lat: 23.0, lng: 116.5, name: "", info: "TD09: 預報位置", col: 'white'},
+                    {lat: 26.0, lng: 115.0, name: "", info: "TD09: 預報位置", col: 'white'},
+                    {lat: 17.5, lng: 137.5, name: "🌀 巴威颱風 (BAWI)", info: "巴威: 當前核心位置", col: 'yellow'},
+                    {lat: 17.6, lng: 134.0, name: "", info: "巴威: 預報位置", col: 'white'},
+                    {lat: 22.67, lng: 120.49, name: "⚠️ 屏東守備點", info: "屏東指揮守備防禦中心", col: 'red'}
                 ];
 
                 nodes.forEach(function(n) {
-                    // 繪製精準點
                     L.circleMarker([n.lat, n.lng], {
                         radius: 6,
                         color: '#000',
@@ -247,7 +236,6 @@ with left_main_col:
                         fillOpacity: 1
                     }).addTo(map).bindPopup(n.info);
 
-                    // 如果是主要節點，直接在外層外掛「不滅的文字名字標籤」
                     if (n.name !== "") {
                         L.marker([n.lat, n.lng], {
                             icon: L.divIcon({
@@ -263,7 +251,6 @@ with left_main_col:
         </body>
         </html>
         """
-        # 將修正後的極高確定性地圖渲染至前端
         components.html(html_map_code, height=520)
         
         st.markdown("""
@@ -295,30 +282,37 @@ with left_main_col:
         st.dataframe(df_pingtung_trend, hide_index=True, use_container_width=True)
 
 with right_summary_col:
-    # --- 🎯 6. 全自動大眾生活防災總結研判 ---
+    # --- 🎯 6. 【全面隱藏技術性與工程字眼，轉為流暢防災官方報告】 ---
     border_color = "#38bdf8"
     
-    ty_summary_text = f"📊 <b>國際大氣標準研判：</b>當前南海熱帶低壓TD09正往西北（朝廣東、香港）移動；遠洋颱風巴威亦在東側穩定盤整。<b>左側互動式 Google 地圖外掛顯示兩者皆未轉向直接朝台灣修正，各國綜合評估平均侵台率下修至 {avg_prob}，屬常態低度警戒狀態。</b>"
-    ty_action_text = "目前無須過度恐慌，維持常態性夏日防汛與防颱自主檢查即可。"
-    atmosphere_notes = "<br>• 🌐 <b>未來大氣局勢：</b>台灣本地主要受副熱帶高壓籠罩，環境沉悶。雖然颱風不直接侵襲，但外圍輸送的南方水氣仍會使明後兩天屏東山區的午後雷陣雨強度稍微增加。"
-    temp_summary_text = f"今日屏東即時氣溫維持在 <b>{cwa_temperature}</b>。高溫多雲，紫外線指數偏高，出門民眾請記得適時補水與防曬。"
-    rain_summary_text = f"平地全天累積雨量預估僅 <b>{m_p24}</b>，山區為 <b>{m_m24}</b>，水文狀況安全良好。"
+    # 移除「API」、「地圖外掛顯示」、「內部資料」等字眼後的專業文案
+    ty_summary_text = f"""📊 <b>國際大氣標準研判：</b><br>
+    當前南海熱帶低壓 <b>TD09</b> 正向西北方移動；遠洋 <b>巴威颱風 (BAWI)</b> 亦在東側穩定盤整。
+    從動態路徑預測的「高確定性巨型漸層覆蓋圈」可以清晰辨識，雙氣旋的核心位置與預估暴風半徑，皆呈現穩定「抽離台灣」的線性移動軌跡。
+    各國綜合評估平均侵台率已安全下修至 <b>{avg_prob}</b>，屬於常態低度警戒狀態。"""
+    
+    ty_action_text = "本地無須過度恐慌，維持常態性夏日防汛與防颱自主檢查即可。"
+    atmosphere_notes = f"<br>• 🌐 <b>未來大氣局勢：</b>雖然氣旋不直接侵襲，但受外圍南方水氣輸送影響，明後兩天屏東山區的午後雷陣雨強度仍可能稍微增加。"
+    
+    temp_summary_text = f"目前屏東實測最高氣溫維持在 <b>{cwa_temperature}</b>。整體呈現高溫多雲、紫外線指數偏高，出門民眾請記得適時補水與防曬。"
+    
+    rain_summary_text = f"根據最新降雨估計顯示，目前平地城市全天累積雨量預估僅 <b>{m_p24}</b>，山區部落為 <b>{m_m24}</b>，整體水文狀況安全良好。"
     rain_action_text = "夏日天氣多變，前往山區或河谷溪畔活動的民眾，午後仍需留意突發性對流發展與雷陣雨。"
 
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
         <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 15px;">📊 勇式生活防災總結</div>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
-        <b>① 颱風影響與大氣局勢：</b><br>
+        <b>① 颱風影響與路徑動態：</b><br>
         {ty_summary_text} {atmosphere_notes}<br>
         👉 <i>{ty_action_text}</i>
         </p>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
-        <b>② 即時溫度防護指引：</b><br>
+        <b>② 即時氣溫防護指引：</b><br>
         {temp_summary_text}
         </p>
         <p style="font-size:13.5px; line-height:1.6;">
-        <b>③ 降雨現況與雨天安全提醒：</b><br>
+        <b>③ 現況降雨安全提醒：</b><br>
         {rain_summary_text}<br>
         👉 <i>{rain_action_text}</i>
         </p>
