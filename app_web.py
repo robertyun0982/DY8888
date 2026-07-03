@@ -152,7 +152,7 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 🎯 🎯 【Google 地圖外掛】 🎯 🎯
+        # 🎯 🎯 【純粹高精確圓點地圖圖層】 🎯 🎯
         html_map_code = """
         <!DOCTYPE html>
         <html>
@@ -162,18 +162,16 @@ with left_main_col:
             <style>
                 #map { width: 100%; height: 515px; border-radius: 8px; border: 1px solid #334155; }
                 body { margin: 0; padding: 0; background: #0f172a; }
-                .typhoon-label {
-                    background: rgba(15, 23, 42, 0.85);
+                .leaflet-popup-content { font-family: sans-serif; font-size: 12px; font-weight: bold; }
+                /* 氣象站文字提示窗自訂樣式，輔助圓點點擊 */
+                .leaflet-tooltip {
+                    background: rgba(15, 23, 42, 0.9);
                     border: 1px solid #38bdf8;
                     color: #fff;
                     font-weight: bold;
                     font-size: 11px;
-                    padding: 2px 6px;
                     border-radius: 4px;
-                    white-space: nowrap;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
                 }
-                .leaflet-popup-content { font-family: sans-serif; font-size: 12px; font-weight: bold; }
             </style>
         </head>
         <body>
@@ -191,6 +189,7 @@ with left_main_col:
                 L.polygon(td09Poly, {color: '#ef4444', weight: 1, fillColor: '#22c55e', fillOpacity: 0.2}).addTo(map);
                 L.polygon(bawiPoly, {color: '#ef4444', weight: 1, fillColor: '#22c55e', fillOpacity: 0.2}).addTo(map);
 
+                // 大面積半透明覆蓋圈
                 var pathCircles = [
                     {lat: 16.0, lng: 124.0, col: '#06b6d4', op: 0.12, rad: 200000},
                     {lat: 17.5, lng: 122.5, col: '#06b6d4', op: 0.18, rad: 200000},
@@ -218,34 +217,29 @@ with left_main_col:
                     }).addTo(map);
                 });
 
+                // 🔴 徹底移除所有客製圖示標記，完全改用純粹的 L.circleMarker (定位圓點)
                 var nodes = [
-                    {lat: 21.0, lng: 118.5, name: "🌀 熱帶低壓 TD09", info: "TD09: 當前核心位置", col: 'yellow'},
-                    {lat: 23.0, lng: 116.5, name: "", info: "TD09: 預報位置", col: 'white'},
-                    {lat: 26.0, lng: 115.0, name: "", info: "TD09: 預報位置", col: 'white'},
-                    {lat: 17.5, lng: 137.5, name: "🌀 巴威颱風 (BAWI)", info: "巴威: 當前核心位置", col: 'yellow'},
-                    {lat: 17.6, lng: 134.0, name: "", info: "巴威: 預報位置", col: 'white'},
-                    {lat: 22.67, lng: 120.49, name: "⚠️ 屏東守備點", info: "屏東指揮守備防禦中心", col: 'red'}
+                    {lat: 21.0, lng: 118.5, info: "🌀 熱帶低壓 TD09 (當前核心位置)", col: '#f59e0b', rad: 8},
+                    {lat: 23.0, lng: 116.5, info: "熱帶低壓 TD09 (預報位置)", col: '#ffffff', rad: 5},
+                    {lat: 26.0, lng: 115.0, info: "熱帶低壓 TD09 (預報位置)", col: '#ffffff', rad: 5},
+                    
+                    {lat: 17.5, lng: 137.5, info: "🌀 巴威颱風 (BAWI) (當前核心位置)", col: '#f59e0b', rad: 8},
+                    {lat: 17.6, lng: 134.0, info: "巴威颱風 (BAWI) (預報位置)", col: '#ffffff', rad: 5},
+                    
+                    {lat: 22.67, lng: 120.49, info: "⚠️ 屏東守備防禦指揮點", col: '#ef4444', rad: 9}
                 ];
 
                 nodes.forEach(function(n) {
-                    L.circleMarker([n.lat, n.lng], {
-                        radius: 6,
-                        color: '#000',
-                        weight: 1.5,
+                    var marker = L.circleMarker([n.lat, n.lng], {
+                        radius: n.rad,
+                        color: '#0f172a',
+                        weight: 2,
                         fillColor: n.col,
                         fillOpacity: 1
                     }).addTo(map).bindPopup(n.info);
-
-                    if (n.name !== "") {
-                        L.marker([n.lat, n.lng], {
-                            icon: L.divIcon({
-                                className: 'custom-div-icon',
-                                html: "<div class='typhoon-label'>" + n.name + "</div>",
-                                iconSize: [0, 0],
-                                iconAnchor: [-10, 10]
-                            })
-                        }).addTo(map);
-                    }
+                    
+                    // 滑鼠懸停直接浮現名稱提示，防呆且清晰
+                    marker.bindTooltip(n.info.split(" (")[0], {permanent: false, direction: 'top'});
                 });
             </script>
         </body>
@@ -256,8 +250,9 @@ with left_main_col:
         st.markdown("""
         <div style="background-color:#0f172a; border:1px solid #334155; padding:10px; border-radius:6px; margin-top:8px;">
             <span style="font-size:11px; color:#94a3b8; font-weight:bold;">🌀 高確定性精準圖層動態說明：</span><br>
-            <span style="color:#38bdf8; font-size:12px;">■</span> <b style="font-size:12px;">颱風名字標籤：</b>地圖上直接掛載 <b>巴威颱風 (BAWI)</b> 與 <b>熱帶低壓 TD09</b> 的即時識別文字。<br>
-            <span style="color:#ef4444; font-size:12px;">●</span> <b style="font-size:12px;">高精準確定性路徑：</b>每一個巨型半透明侵襲圈皆精準切齊官方經緯度，由深至淺呈現氣旋未來 48 小時無修正偏向、穩定抽離台灣的確定性線性軌跡。
+            <span style="color:#f59e0b; font-size:12px;">●</span> <b style="font-size:12px;">黃色核心圓點：</b>代表 <b>巴威颱風 (BAWI)</b> 與 <b>熱帶低壓 TD09</b> 的即時中心定位點。<br>
+            <span style="color:#ef4444; font-size:12px;">●</span> <b style="font-size:12px;">紅色守備圓點：</b>代表屏東本地重點防禦指揮中心位置。<br>
+            <span style="color:#ef4444; font-size:12px;">●</span> <b style="font-size:12px;">高精準確定性路徑：</b>每一個巨型半透明侵襲圈皆精準切齊圓點經緯度，由深至淺呈現氣旋未來移動的線性軌跡。
         </div>
         """, unsafe_allow_html=True)
 
@@ -282,10 +277,8 @@ with left_main_col:
         st.dataframe(df_pingtung_trend, hide_index=True, use_container_width=True)
 
 with right_summary_col:
-    # --- 🎯 6. 【全面隱藏技術性與工程字眼，轉為流暢防災官方報告】 ---
     border_color = "#38bdf8"
     
-    # 移除「API」、「地圖外掛顯示」、「內部資料」等字眼後的專業文案
     ty_summary_text = f"""📊 <b>國際大氣標準研判：</b><br>
     當前南海熱帶低壓 <b>TD09</b> 正向西北方移動；遠洋 <b>巴威颱風 (BAWI)</b> 亦在東側穩定盤整。
     從動態路徑預測的「高確定性巨型漸層覆蓋圈」可以清晰辨識，雙氣旋的核心位置與預估暴風半徑，皆呈現穩定「抽離台灣」的線性移動軌跡。
