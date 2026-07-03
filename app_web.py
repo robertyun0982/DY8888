@@ -1,10 +1,8 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import requests
+import pydeck as pdk
 import math
+import requests
 from datetime import datetime, timedelta
 
 # 1. 網頁基礎設定 (全域唯一，絕不重複渲染)
@@ -12,6 +10,9 @@ st.set_page_config(page_title="勇式防災網", page_icon="⚡", layout="wide")
 
 # 金鑰對接
 CWA_TOKEN = "CWA-21A6E335-B671-4A06-82CC-1AD7B103CEF5"
+
+# 台灣與屏東縣基準座標
+PT_LAT, PT_LON = 22.67, 120.49 
 
 # --- 🚀 2. 專用穩定 CSS ---
 st.markdown("""
@@ -56,10 +57,16 @@ st.markdown("""
             color: #94a3b8 !important;
             font-size: 11px;
         }
+        
+        .stPydeckChart {
+            border-radius: 8px; 
+            overflow: hidden; 
+            background-color: #0f172a;
+            border: 1px solid #1e293b;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# ⚡ 乾淨標題
 st.title("⚡ 勇式防災網")
 
 # --- 🎯 3. 強制校對台灣時間 (UTC+8) ---
@@ -124,7 +131,7 @@ val_p24 = int(m_p24.replace(" mm", ""))
 val_m24 = int(m_m24.replace(" mm", ""))
 val_temp = float(cwa_temperature.replace("°C", ""))
 
-# 🎯 按照國際標準修改：修正確實侵台機率 (TD09朝廣東、巴威尚遠，侵台率處於低至中度警戒)
+# 🎯 按照國際標準修改：修正確實侵台機率
 avg_prob = "18.5%"
 NATIONAL_PREDICTIONS = [
     {"name": "台灣中央氣象署", "display_prob": "15.0%"},
@@ -153,7 +160,6 @@ with left_main_col:
     with list_col:
         prob_rows = []
         for p in NATIONAL_PREDICTIONS:
-            # 侵台率改為安全的綠/黃色調
             prob_rows.append(f'<div class="prob-row"><span class="prob-label">{p["name"]}</span><span style="color:#34d399; font-size:11.5px;">{p["display_prob"]}</span></div>')
         prob_html = "".join(prob_rows)
         
@@ -169,110 +175,61 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 🎯 🎯 99% 精美復刻：中央氣象署「真實海岸線流線圖」 🎯 🎯
-        fig, ax = plt.subplots(figsize=(6.5, 5.2), dpi=150)
-        fig.patch.set_facecolor('#bce2f3')  # 標準海藍底色
-        ax.set_facecolor('#bce2f3')
+        # 🎯 🎯 融合創新：真實地理地圖 + 氣象署路徑元素 🎯 🎯
         
-        # 建立精準經緯度格線與邊界標記
-        ax.set_xlim(110, 145)
-        ax.set_ylim(10, 35)
-        ax.set_xticks([110, 115, 120, 125, 130, 135, 140, 145])
-        ax.set_yticks([10, 15, 20, 25, 30, 35])
-        ax.set_xticklabels(['110°E', '115°E', '120°E', '125°E', '130°E', '135°E', '140°E', '145°E'], fontsize=6, color='#555555')
-        ax.set_yticklabels(['10°N', '15°N', '20°N', '25°N', '30°N', '35°N'], fontsize=6, color='#555555')
-        ax.grid(color='white', linestyle='-', linewidth=0.5, zorder=1)
-        ax.tick_params(axis='both', which='both', length=0, labelsize=6)
-
-        # 🎯 精細化流線陸地幾何 (完美模擬氣象署圖資輪廓)
-        # 台灣本島精細海岸線
-        taiwan_lon = [120.0, 120.2, 120.4, 120.7, 121.1, 121.6, 121.9, 121.9, 121.5, 120.8, 120.4, 120.0]
-        taiwan_lat = [22.0,  22.4,  22.8,  23.5,  24.2,  24.8,  25.3,  25.0,  24.0,  23.0,  22.2,  22.0]
-        ax.fill(taiwan_lon, taiwan_lat, color='#ffffff', edgecolor='#7f9db9', linewidth=0.8, zorder=2)
-        
-        # 中國大陸東南沿海流線輪廓
-        china_lon = [110.0, 111.5, 113.0, 114.5, 116.0, 118.0, 119.5, 120.5, 121.5, 122.5, 122.0, 118.0, 110.0]
-        china_lat = [20.0,  21.2,  22.0,  22.3,  23.1,  24.3,  25.5,  27.0,  29.0,  31.5,  35.0,  35.0,  35.0]
-        ax.fill(china_lon, china_lat, color='#d9ebd3', edgecolor='#7f9db9', linewidth=0.8, zorder=2)
-        
-        # 海南島
-        hainan_lon = [108.5, 109.5, 111.0, 110.5, 109.0, 108.5]
-        hainan_lat = [18.2,  19.5,  19.8,  18.5,  18.1,  18.2]
-        ax.fill(hainan_lon, hainan_lat, color='#d9ebd3', edgecolor='#7f9db9', linewidth=0.6, zorder=2)
-
-        # 菲律賓呂宋島精細化
-        luzon_lon = [120.0, 121.0, 122.2, 122.4, 121.5, 120.2, 120.0]
-        luzon_lat = [14.0,  14.2,  16.0,  18.5,  18.3,  16.0,  14.0]
-        ax.fill(luzon_lon, luzon_lat, color='#ffffff', edgecolor='#7f9db9', linewidth=0.6, zorder=2)
-        
-        # 日本與琉球群島流線
-        kyushu_lon = [130.0, 131.5, 131.8, 130.5, 130.0]
-        kyushu_lat = [31.0,  31.5,  33.0,  33.0,  31.0]
-        ax.fill(kyushu_lon, kyushu_lat, color='#ffffff', edgecolor='#7f9db9', linewidth=0.6, zorder=2)
-        
-        # 琉球群島點狀鏈
-        ax.scatter([127.7, 125.0, 124.0], [26.2, 24.8, 24.4], color='#ffffff', edgecolor='#7f9db9', s=8, zorder=2)
-
-        # --- 氣旋 1: TD09 國際標準前進路徑 ---
-        td_path = np.array([[124.0, 16.0], [122.5, 17.5], [120.8, 19.2], [118.5, 21.0]])
-        ax.plot(td_path[:,0], td_path[:,1], color='#00ffff', linestyle='-', linewidth=2, zorder=3)
-        
-        td_pred = np.array([[118.5, 21.0], [116.5, 23.0], [115.0, 26.0], [114.2, 30.0]])
-        ax.plot(td_pred[:,0], td_pred[:,1], color='#e06666', linestyle='--', linewidth=1.5, zorder=3)
-        
-        # 氣象署標準不規則漸層潛勢範圍 (誤差圈)
-        pot_circle1 = patches.Polygon([[118.5, 19.5], [115.0, 21.0], [112.5, 25.0], [113.0, 31.0], [116.5, 31.0], [118.5, 26.0], [120.0, 22.5]], 
-                                      closed=True, facecolor='#93c47d', edgecolor='#cc0000', alpha=0.4, linewidth=0.8, zorder=2)
-        ax.add_patch(pot_circle1)
-
-        td_nodes = [
-            (124.0, 16.0, "01日", "bottom"), (122.5, 17.5, "02日08時", "bottom"), 
-            (120.8, 19.2, "02日20時", "bottom"), (118.5, 21.0, "03日08時", "left"),
-            (116.5, 23.0, "03日20時", "left"), (115.0, 26.0, "04日08時", "left"),
-            (114.2, 30.0, "06日08時", "left")
+        # A. 颱風巴威與熱帶低壓TD09的「歷史與未來預測路徑點」
+        # 節點資料：包含時間標籤、顏色
+        nodes_list = [
+            {"lon": 118.5, "lat": 21.0, "name": "TD09 03日08時", "color": [255, 102, 0, 255], "size": 30000},
+            {"lon": 116.5, "lat": 23.0, "name": "TD09 03日20時", "color": [61, 61, 61, 255], "size": 25000},
+            {"lon": 115.0, "lat": 26.0, "name": "TD09 04日08時", "color": [255, 255, 255, 255], "size": 20000},
+            {"lon": 137.5, "lat": 17.5, "name": "巴威 03日20時", "color": [255, 102, 0, 255], "size": 30000},
+            {"lon": 134.0, "lat": 17.6, "name": "巴威 04日08時", "color": [255, 255, 255, 255], "size": 25000},
+            {"lon": 130.0, "lat": 18.0, "name": "巴威 05日08時", "color": [255, 255, 255, 255], "size": 20000},
+            {"lon": PT_LON, "lat": PT_LAT, "name": "屏東防禦點", "color": [225, 29, 72, 255], "size": 15000}
         ]
-        for x, y, lbl, pos in td_nodes:
-            color = '#ff6600' if "03日08時" in lbl else ('#3d3d3d' if "20時" in lbl else 'white')
-            ax.scatter(x, y, color=color, edgecolor='black', s=25, lw=0.6, zorder=4)
-            ax.annotate(lbl, xy=(x, y), xytext=(x-4.5, y-2 if pos=="left" else y-3.8),
-                        arrowprops=dict(arrowstyle="-", color='black', linewidth=0.5),
-                        bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='black', lw=0.5), fontsize=5.5, zorder=5)
-        ax.text(121.2, 20.4, "TD09", bbox=dict(boxstyle='square,pad=0.2', fc='white', ec='gray', lw=0.5), fontsize=6.5, fontweight='bold')
+        df_nodes = pd.DataFrame(nodes_list)
 
-        # --- 氣旋 2: 颱風巴威 ---
-        bawi_path = np.array([[142.0, 17.0], [140.0, 17.2], [137.5, 17.5]])
-        ax.plot(bawi_path[:,0], bawi_path[:,1], color='#ffffff', linestyle='-', linewidth=2, zorder=3)
-        
-        bawi_pred = np.array([[137.5, 17.5], [134.0, 17.6], [130.0, 18.0], [125.0, 19.5]])
-        ax.plot(bawi_pred[:,0], bawi_pred[:,1], color='#e06666', linestyle='--', linewidth=1.5, zorder=3)
-        
-        pot_circle2 = patches.Polygon([[137.5, 16.5], [132.0, 15.5], [123.0, 17.0], [124.0, 22.0], [132.0, 20.0], [138.0, 19.0]], 
-                                      closed=True, facecolor='#6aa84f', edgecolor='#cc0000', alpha=0.4, linewidth=0.8, zorder=2)
-        ax.add_patch(pot_circle2)
-        
-        bawi_nodes = [
-            (142.0, 17.0, "01日", "bottom"), (140.0, 17.2, "02日08時", "bottom"),
-            (137.5, 17.5, "03日20時", "top"), (134.0, 17.6, "04日08時", "top"),
-            (130.0, 18.0, "05日08時", "top"), (125.0, 19.5, "07日08時", "top")
+        # B. 氣象署經典不規則路徑線 (過去實線，未來預測虛線/細線)
+        path_data = [
+            {"path": [[124.0, 16.0], [122.5, 17.5], [120.8, 19.2], [118.5, 21.0]], "color": [0, 255, 255, 255]}, # 過去
+            {"path": [[118.5, 21.0], [116.5, 23.0], [115.0, 26.0], [114.2, 30.0]], "color": [224, 102, 102, 200]}, # 預測
+            {"path": [[142.0, 17.0], [140.0, 17.2], [137.5, 17.5]], "color": [255, 255, 255, 255]}, # 巴威過去
+            {"path": [[137.5, 17.5], [134.0, 17.6], [130.0, 18.0], [125.0, 19.5]], "color": [224, 102, 102, 200]} # 巴威預測
         ]
-        for x, y, lbl, pos in bawi_nodes:
-            color = '#ff6600' if "03日20時" in lbl else ('#3d3d3d' if "20時" in lbl else 'white')
-            ax.scatter(x, y, color=color, edgecolor='black', s=25, lw=0.6, zorder=4)
-            ax.annotate(lbl, xy=(x, y), xytext=(x+1, y-3.8 if pos=="bottom" else y+2.8),
-                        arrowprops=dict(arrowstyle="-", color='black', linewidth=0.5),
-                        bbox=dict(boxstyle='round,pad=0.15', fc='white', ec='black', lw=0.5), fontsize=5.5, zorder=5)
-        ax.text(140.8, 18.7, "巴威", bbox=dict(boxstyle='square,pad=0.2', fc='white', ec='gray', lw=0.5), fontsize=6.5, fontweight='bold')
+        df_paths = pd.DataFrame(path_data)
 
-        # 左上角歷史標準時間軸
-        ax.text(111, 33.5, "2026/07/02 08:00 LST", fontsize=9, fontweight='bold', color='black',
-                bbox=dict(boxstyle='square,pad=0.2', fc='white', alpha=0.8, ec='none'))
-        
-        # 🎯 右下角完美復刻：氣象署標準波浪圖標
-        ax.text(141, 10.8, "CWA", fontsize=8, color='#004d99', fontweight='bold', italic=True, zorder=5)
-        wave = patches.Arc((142.5, 10.5), 3, 1, angle=0, theta1=0, theta2=180, color='#004d99', linewidth=1, zorder=5)
-        ax.add_patch(wave)
+        # C. 氣象署標準 70% 綠色半透明潛勢圈範圍 (多邊形呈現)
+        polygon_data = [
+            {
+                "polygon": [[118.5, 19.5], [115.0, 21.0], [112.5, 25.0], [113.0, 31.0], [116.5, 31.0], [118.5, 26.0], [120.0, 22.5]],
+                "fill_color": [147, 196, 125, 100], "line_color": [204, 0, 0, 180]
+            },
+            {
+                "polygon": [[137.5, 16.5], [132.0, 15.5], [123.0, 17.0], [124.0, 22.0], [132.0, 20.0], [138.0, 19.0]],
+                "fill_color": [106, 168, 79, 100], "line_color": [204, 0, 0, 180]
+            }
+        ]
+        df_polygons = pd.DataFrame(polygon_data)
 
-        st.pyplot(fig, use_container_width=True)
+        # 組合 Pydeck 多重專業渲染層
+        layers = [
+            # 1. 潛勢圈圈圖層
+            pdk.Layer("PolygonLayer", df_polygons, get_polygon="polygon", get_fill_color="fill_color", get_line_color="line_color", line_width_min_pixels=1, filled=True, extruded=False),
+            # 2. 前進預測路徑線圖層
+            pdk.Layer("PathLayer", df_paths, get_path="path", get_color="color", width_min_pixels=3),
+            # 3. 氣旋關鍵節點圖層
+            pdk.Layer("ScatterplotLayer", df_nodes, get_position=["lon", "lat"], get_radius="size", get_fill_color="color", pickable=True),
+            # 4. 對話框文字標籤圖層 (與氣象署標籤 99% 呼應)
+            pdk.Layer("TextLayer", df_nodes, get_position=["lon", "lat"], get_text="name", get_color=[255, 255, 255, 255], get_size=11, get_alignment_baseline="bottom", background_color=[15, 23, 42, 180])
+        ]
+
+        # 輸出高質感真實地圖
+        st.pydeck_chart(pdk.Deck(
+            map_style="mapbox://styles/mapbox/dark-v10", # 採用精美高防禦質感的深色真實地圖底圖
+            initial_view_state=pdk.ViewState(latitude=22.0, longitude=125.0, zoom=4.8),
+            layers=layers
+        ), use_container_width=True)
 
     with data_col:
         temp_color = "#38bdf8"
@@ -296,9 +253,9 @@ with left_main_col:
 
 with right_summary_col:
     # --- 🎯 6. 全自動大眾生活防災總結研判 ---
-    border_color = "#38bdf8" # 恢復安全防禦藍
+    border_color = "#38bdf8" 
     
-    ty_summary_text = f"📊 <b>國際大氣標準研判：</b>當前南海熱帶低壓TD09受太平洋高壓邊緣導引，正往西北（朝廣東、香港）移動；遠洋颱風巴威亦在東側穩定盤整。<b>左側精細路徑圖顯示兩者皆未轉向直接朝台灣修正，各國綜合評估平均侵台率僅 {avg_prob}，屬常態低度警戒狀態。</b>"
+    ty_summary_text = f"📊 <b>國際大氣標準研判：</b>當前南海熱帶低壓TD09受太平洋高壓邊緣導引，正往西北（朝廣東、香港）移動；遠洋颱風巴威亦在東側穩定盤整。<b>左側融合地圖顯示兩者皆未轉向直接朝台灣修正，各國綜合評估平均侵台率僅 {avg_prob}，屬常態低度警戒狀態。</b>"
     ty_action_text = "目前無須過度恐慌，維持常態性夏日防汛與防颱自主檢查即可。"
     atmosphere_notes = "<br>• 🌐 <b>未來大氣局勢：</b>台灣本地主要受副熱帶高壓籠罩，環境沉悶。雖然颱風不直接侵襲，但外圍輸送的南方水氣仍會使明後兩天屏東山區的午後雷陣雨強度稍微增加。"
     temp_summary_text = f"今日屏東即時氣溫維持在 <b>{cwa_temperature}</b>。高溫多雲，紫外線指數偏高，出門民眾請記得適時補水與防曬。"
