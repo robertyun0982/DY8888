@@ -1,7 +1,18 @@
+import subprocess
+import sys
+
+# 🎯 終極內建補件防線：如果雲端沒安裝，程式碼自己強制下載，絕不報錯
+try:
+    import folium
+    from streamlit_folium import st_folium
+except ModuleNotFoundError:
+    # 發現缺件，立刻自動背景安裝
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "folium==0.16.0", "streamlit-folium==0.18.0"])
+    import folium
+    from streamlit_folium import st_folium
+
 import streamlit as st
 import pandas as pd
-import folium
-from streamlit_folium import st_folium
 import math
 import requests
 from datetime import datetime, timedelta
@@ -155,29 +166,29 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 🎯 🎯 融合創新：調用 Google Maps 底圖引擎 🎯 🎯
-        # 初始化具有 Google Maps 風格的互動式地圖
+        # 🎯 🎯 【Google Maps 引擎融合】 🎯 🎯
         m = folium.Map(
             location=[21.8, 125.0], 
             zoom_start=5, 
-            tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", # 強制載入標準精美 Google Maps 圖磚
-            attr="Google Maps"
+            tiles="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", # 載入真實 Google Maps 向量圖磚
+            attr="Google Maps",
+            zoom_control=False 
         )
         
-        # A. 疊加氣象署標準 70% 綠色半透明潛勢範圍圈 (多邊形)
+        # A. 疊加氣象署 70% 綠色半透明潛勢範圍圈 (多邊形)
         td09_poly = [[19.5, 118.5], [21.0, 115.0], [25.0, 112.5], [31.0, 113.0], [31.0, 116.5], [26.0, 118.5], [22.5, 120.0]]
         bawi_poly = [[16.5, 137.5], [15.5, 132.0], [17.0, 123.0], [22.0, 124.0], [20.0, 132.0], [19.0, 138.0]]
         
-        folium.Polygon(locations=td09_poly, color="red", weight=1.5, fill=True, fill_color="green", fill_opacity=0.3, popup="TD09 70% 潛勢範圍").add_to(m)
-        folium.Polygon(locations=bawi_poly, color="red", weight=1.5, fill=True, fill_color="green", fill_opacity=0.3, popup="巴威颱風 70% 潛勢範圍").add_to(m)
+        folium.Polygon(locations=td09_poly, color="#ef4444", weight=1.5, fill=True, fill_color="#22c55e", fill_opacity=0.3, tooltip="TD09 70% 潛勢範圍").add_to(m)
+        folium.Polygon(locations=bawi_poly, color="#ef4444", weight=1.5, fill=True, fill_color="#22c55e", fill_opacity=0.3, tooltip="巴威颱風 70% 潛勢範圍").add_to(m)
 
-        # B. 繪製氣旋預測路徑線 (過去實線藍、未來預測紅)
-        folium.PolyLine(locations=[[16.0, 124.0], [17.5, 122.5], [19.2, 120.8], [21.0, 118.5]], color="cyan", weight=4).add_to(m)
-        folium.PolyLine(locations=[[21.0, 118.5], [23.0, 116.5], [26.0, 115.0], [30.0, 114.2]], color="red", weight=3, dash_array="5, 5").add_to(m)
-        folium.PolyLine(locations=[[17.0, 142.0], [17.2, 140.0], [17.5, 137.5]], color="white", weight=4).add_to(m)
-        folium.PolyLine(locations=[[17.5, 137.5], [17.6, 134.0], [18.0, 130.0], [19.5, 125.0]], color="red", weight=3, dash_array="5, 5").add_to(m)
+        # B. 繪製氣旋預測路徑線 (過去藍、未來紅)
+        folium.PolyLine(locations=[[16.0, 124.0], [17.5, 122.5], [19.2, 120.8], [21.0, 118.5]], color="#22d3ee", weight=4).add_to(m)
+        folium.PolyLine(locations=[[21.0, 118.5], [23.0, 116.5], [26.0, 115.0], [30.0, 114.2]], color="#ef4444", weight=3, dash_array="5, 5").add_to(m)
+        folium.PolyLine(locations=[[17.0, 142.0], [17.2, 140.0], [17.5, 137.5]], color="#ffffff", weight=4).add_to(m)
+        folium.PolyLine(locations=[[17.5, 137.5], [17.6, 134.0], [18.0, 130.0], [19.5, 125.0]], color="#ef4444", weight=3, dash_array="5, 5").add_to(m)
 
-        # C. 標記關鍵時間節點對話框
+        # C. 點位標記
         nodes = [
             {"loc": [21.0, 118.5], "info": "TD09: 03日08時", "color": "orange"},
             {"loc": [23.0, 116.5], "info": "TD09: 03日20時", "color": "gray"},
@@ -189,7 +200,7 @@ with left_main_col:
         for n in nodes:
             folium.CircleMarker(location=n["loc"], radius=6, color="black", weight=1, fill=True, fill_color=n["color"], fill_opacity=0.9, tooltip=n["info"]).add_to(m)
 
-        # 渲染地圖
+        # 渲染出極致精美的 Google 地圖
         st_folium(m, width="100%", height=520, returned_objects=[])
 
     with data_col:
