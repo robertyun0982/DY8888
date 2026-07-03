@@ -72,7 +72,7 @@ def fetch_cwa_data(token):
     
     atmospheric_status = {"has_low_pressure": True, "has_high_pressure": True}
     backup_trend = []
-    base_descriptions = ["午後山區有局部短暫雷陣雨", "各地大多為多雲到晴", "沿海平地清晨有零星陣雨", "山區午後對流發展較旺盛", "各地維持晴到多雲"]
+    base_descriptions = ["午後山區有局部短暫雷陣雨", "各地大多為多雲到晴", "沿海平地清晨有零星陣著", "山區午後對流發展較旺盛", "各地維持晴到多雲"]
     for i in range(5):
         future_day = tw_time + timedelta(days=i)
         day_str = future_day.strftime("%m/%d")
@@ -153,7 +153,7 @@ with left_main_col:
         """, unsafe_allow_html=True)
 
     with map_col:
-        # 🎯 🎯 【Google 地圖外掛：路徑全面圓圈化】 🎯 🎯
+        # 🎯 🎯 【Google 地圖外掛：大面積半透明巨型路徑圈】 🎯 🎯
         html_map_code = """
         <!DOCTYPE html>
         <html>
@@ -169,9 +169,9 @@ with left_main_col:
         <body>
             <div id="map"></div>
             <script>
-                var map = L.map('map', {zoomControl: false}).setView([22.0, 126.0], 5);
+                var map = L.map('map', {zoomControl: false}).setView([22.0, 124.0], 5);
 
-                // 載入正宗 Google 地圖標準街景圖磚
+                // 載入正宗 Google 地圖標準街道圖磚
                 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
                     attribution: 'Google Maps'
                 }).addTo(map);
@@ -180,54 +180,54 @@ with left_main_col:
                 var td09Poly = [[19.5, 118.5], [21.0, 115.0], [25.0, 112.5], [31.0, 113.0], [31.0, 116.5], [26.0, 118.5], [22.5, 120.0]];
                 var bawiPoly = [[16.5, 137.5], [15.5, 132.0], [17.0, 123.0], [22.0, 124.0], [20.0, 132.0], [19.0, 138.0]];
 
-                L.polygon(td09Poly, {color: '#ef4444', weight: 1, fillColor: '#22c55e', fillOpacity: 0.35}).addTo(map).bindPopup("TD09 70% 潛勢範圍");
-                L.polygon(bawiPoly, {color: '#ef4444', weight: 1, fillColor: '#22c55e', fillOpacity: 0.35}).addTo(map).bindPopup("巴威颱風 70% 潛勢範圍");
+                L.polygon(td09Poly, {color: '#ef4444', weight: 1, fillColor: '#22c55e', fillOpacity: 0.25}).addTo(map).bindPopup("TD09 70% 潛勢範圍");
+                L.polygon(bawiPoly, {color: '#ef4444', weight: 1, fillColor: '#22c55e', fillOpacity: 0.25}).addTo(map).bindPopup("巴威颱風 70% 潛勢範圍");
 
-                // 🔴 2. 移除實線/虛線，改用「連續圓圈」來替代並顯示颱風軌跡路徑
+                // 🔴 2. 終極優化：將軌跡點放大為 180~250 公里的巨型「半透明線性覆蓋圈」，打造超強衝擊感！
                 var pathCircles = [
-                    // TD09 軌跡點
-                    {lat: 16.0, lng: 124.0, col: '#06b6d4', op: 0.4},
-                    {lat: 17.5, lng: 122.5, col: '#06b6d4', op: 0.5},
-                    {lat: 19.2, lng: 120.8, col: '#06b6d4', op: 0.6},
-                    {lat: 21.0, lng: 118.5, col: '#ef4444', op: 0.7}, // 目前位置
-                    {lat: 23.0, lng: 116.5, col: '#ef4444', op: 0.5},
-                    {lat: 26.0, lng: 115.0, col: '#ef4444', op: 0.4},
-                    {lat: 30.0, lng: 114.2, col: '#ef4444', op: 0.3},
+                    // TD09 巨型漸層軌跡點 (半徑放大至 180000 米 = 180公里)
+                    {lat: 16.0, lng: 124.0, col: '#06b6d4', op: 0.15, rad: 180000},
+                    {lat: 17.5, lng: 122.5, col: '#06b6d4', op: 0.20, rad: 180000},
+                    {lat: 19.2, lng: 120.8, col: '#06b6d4', op: 0.25, rad: 200000},
+                    {lat: 21.0, lng: 118.5, col: '#ef4444', op: 0.35, rad: 220000}, // 當前暴風警戒區
+                    {lat: 23.0, lng: 116.5, col: '#ef4444', op: 0.25, rad: 240000},
+                    {lat: 26.0, lng: 115.0, col: '#ef4444', op: 0.20, rad: 260000},
+                    {lat: 30.0, lng: 114.2, col: '#ef4444', op: 0.15, rad: 280000},
                     
-                    // 巴威 軌跡點
-                    {lat: 17.0, lng: 142.0, col: '#a855f7', op: 0.4},
-                    {lat: 17.2, lng: 140.0, col: '#a855f7', op: 0.5},
-                    {lat: 17.5, lng: 137.5, col: '#ef4444', op: 0.7}, // 目前位置
-                    {lat: 17.6, lng: 134.0, col: '#ef4444', op: 0.5},
-                    {lat: 18.0, lng: 130.0, col: '#ef4444', op: 0.4},
-                    {lat: 19.5, lng: 125.0, col: '#ef4444', op: 0.3}
+                    // 巴威 巨型漸層軌跡點
+                    {lat: 17.0, lng: 142.0, col: '#a855f7', op: 0.15, rad: 180000},
+                    {lat: 17.2, lng: 140.0, col: '#a855f7', op: 0.20, rad: 180000},
+                    {lat: 17.5, lng: 137.5, col: '#ef4444', op: 0.35, rad: 220000}, // 當前暴風警戒區
+                    {lat: 17.6, lng: 134.0, col: '#ef4444', op: 0.25, rad: 240000},
+                    {lat: 18.0, lng: 130.0, col: '#ef4444', op: 0.20, rad: 260000},
+                    {lat: 19.5, lng: 125.0, col: '#ef4444', op: 0.15, rad: 280000}
                 ];
 
                 pathCircles.forEach(function(pt) {
                     L.circle([pt.lat, pt.lng], {
-                        radius: 25000, // 圓圈半徑設定為 25 公里，呈現連續點狀路徑
+                        radius: pt.rad, 
                         color: pt.col,
-                        weight: 1,
+                        weight: 1.5,
                         fillColor: pt.col,
                         fillOpacity: pt.op
                     }).addTo(map);
                 });
 
-                // 🟡 3. 打上關鍵預報核心節點標籤
+                // 🟡 3. 核心預報中心點錨定（方便民眾點擊查閱時間）
                 var nodes = [
-                    {lat: 21.0, lng: 118.5, info: "TD09: 03日08時(當前)", col: 'orange'},
-                    {lat: 23.0, lng: 116.5, info: "TD09: 03日20時", col: 'grey'},
-                    {lat: 26.0, lng: 115.0, info: "TD09: 04日08時", col: 'darkred'},
-                    {lat: 17.5, lng: 137.5, info: "巴威: 03日20時(當前)", col: 'orange'},
-                    {lat: 17.6, lng: 134.0, info: "巴威: 04日08時", col: 'darkred'},
-                    {lat: 22.67, lng: 120.49, info: "屏東防禦點", col: 'red'}
+                    {lat: 21.0, lng: 118.5, info: "TD09: 03日08時(當前位置)", col: 'yellow'},
+                    {lat: 23.0, lng: 116.5, info: "TD09: 03日20時(預報)", col: 'white'},
+                    {lat: 26.0, lng: 115.0, info: "TD09: 04日08時(預報)", col: 'white'},
+                    {lat: 17.5, lng: 137.5, info: "巴威: 03日20時(當前位置)", col: 'yellow'},
+                    {lat: 17.6, lng: 134.0, info: "巴威: 04日08時(預報)", col: 'white'},
+                    {lat: 22.67, lng: 120.49, info: "⚠️ 屏東守備防禦點", col: 'red'}
                 ];
 
                 nodes.forEach(function(n) {
                     L.circleMarker([n.lat, n.lng], {
                         radius: 6,
                         color: '#000',
-                        weight: 1,
+                        weight: 1.2,
                         fillColor: n.col,
                         fillOpacity: 1
                     }).addTo(map).bindPopup(n.info);
@@ -236,14 +236,14 @@ with left_main_col:
         </body>
         </html>
         """
-        # 將外掛完美融合地圖渲染至網頁中
+        # 將動態衝擊感地圖渲染至網頁中
         components.html(html_map_code, height=520)
         
         st.markdown("""
         <div style="background-color:#0f172a; border:1px solid #334155; padding:10px; border-radius:6px; margin-top:8px;">
-            <span style="font-size:11px; color:#94a3b8; font-weight:bold;">🌀 Google 地圖外掛動態疊加說明：</span><br>
-            <span style="color:#22c55e; font-size:12px;">●</span> <b style="font-size:12px;">70% 綠色圈：</b>中央氣象署規範潛勢範圍，顯示TD09與巴威雙氣旋皆朝遠離台灣方向移動。<br>
-            <span style="color:#ef4444; font-size:12px;">●</span> <b style="font-size:12px;">漸層圓圈軌跡：</b>圓圈代表颱風移動路徑，顏色越深代表距離當前時間點越近，點擊核心節點可查看預報詳情。
+            <span style="font-size:11px; color:#94a3b8; font-weight:bold;">🌀 巨型暴風侵襲半徑疊加說明：</span><br>
+            <span style="color:#22c55e; font-size:12px;">●</span> <b style="font-size:12px;">70% 潛勢綠色範圍圈：</b>中央氣象署官方預估的核心潛勢。==24.0%==<br>
+            <span style="color:#ef4444; font-size:12px;">●</span> <b style="font-size:12px;">巨型半透明線性路徑圈：</b>模擬颱風 7 級風暴風半徑（約 180~280 公里）的線性移防軌跡，展現巨型氣旋結構對周邊海域的直接視覺衝擊。
         </div>
         """, unsafe_allow_html=True)
 
