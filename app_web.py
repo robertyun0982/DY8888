@@ -124,18 +124,18 @@ def compute_cyclone_dataframe(name, config):
 
 # 處理即時摘要與動態文字生成
 processed_summary = {}
-dynamic_ty_text_blocks = [] # 用於存放自動生成的氣旋分析文本
+dynamic_ty_text_blocks = [] 
 
 for c_name, c_config in CYCLONE_DATA.items():
     c_dist = calculate_distance(taiwan_lat, taiwan_lng, c_config["current"]["lat"], c_config["current"]["lng"])
     if not c_config["has_threat"]:
         c_prob = 0.0
-        # 💡 依據即時數據動態生成「無威脅」文字
-        text_block = f"• <b>{c_name}</b>：當前距離 {int(c_dist)} 公里，經空間軌跡向性篩選，其路徑持續朝遠離本島方向撤離，直接侵台率判定為 <b>0.0%</b>，已完全排除大氣直接威脅。"
+        # 💡 同步修正總結內部的文字標示
+        text_block = f"• <b>{c_name}</b>：當前距離 {int(c_dist)} 公里，經空間軌跡向性篩選，其路徑持續朝遠離本島方向撤離，預測侵台機率判定為 <b>0.0%</b>，已完全排除大氣直接威脅。"
     else:
         c_prob = max(3.0, min(95.0, round((c_config["base_factor"] / (c_dist + 1)) * 15, 1)))
-        # 💡 依據即時數據動態生成「有潛在影響」文字
-        text_block = f"• <b>{c_name}</b>：目前距離防守點約 {int(c_dist)} 公里，即時綜合侵台率為 <b>{c_prob}%</b>。數值反映其外圍環流變動，主要需防範其在遠洋海域移動時對周邊水氣的牽引影響。"
+        # 💡 同步修正總結內部的文字標示
+        text_block = f"• <b>{c_name}</b>：目前距離防守點約 {int(c_dist)} 公里，預測侵台機率為 <b>{c_prob}%</b>。數值反映其外圍環流變動，主要需防範其在遠洋海域移動時對周邊水氣的牽引影響。"
     
     processed_summary[c_name] = {"dist": int(c_dist), "prob": c_prob}
     dynamic_ty_text_blocks.append(text_block)
@@ -182,7 +182,7 @@ df_pingtung_trend = pd.DataFrame(cwa_trend)
 
 # 頂部跑馬燈
 marquee_alerts = [
-    f"🌀 氣象動態：經空間軌跡向性研判，南海TD09持續朝華南方向撤離，對台直接侵襲機率為0%。",
+    f"🌀 氣象動態：經空間軌跡向性研判，南海TD09持續朝華南方向撤離，預測侵台機率為0%。",
     f"☀️ 即時氣溫：目前屏東測得體感溫度 {cwa_temperature}，午後山區有局部短暫對流雷陣雨。"
 ]
 marquee_text = " | ".join(marquee_alerts)
@@ -211,10 +211,12 @@ with left_main_col:
                 
                 sum_info = processed_summary[t_name]
                 status_note = "<span style='color:#34d399;'>模式研判路徑無侵台威脅</span>" if sum_info['prob'] == 0.0 else "<span style='color:#f59e0b;'>留意遠洋外圍環流變動</span>"
+                
+                # 💡 核心修正：將「今日綜合侵台率」修正為「預測侵台機率」
                 st.markdown(f"""
                 <div style="background-color: #1e293b; padding: 6px; border-radius: 4px; margin-top: 5px; font-size: 11px; color: #e2e8f0; text-align: center; border: 1px solid #334155;">
                     🎯 當前中心距離：<b style="color:#e2e8f0;">{sum_info['dist']} km</b><br>
-                    📊 今日綜合侵台率：<b style="color:#38bdf8; font-size:12px;">{sum_info['prob']}%</b><br>
+                    📊 預測侵台機率：<b style="color:#38bdf8; font-size:12px;">{sum_info['prob']}%</b><br>
                     {status_note}
                 </div>
                 """, unsafe_allow_html=True)
@@ -309,14 +311,10 @@ with left_main_col:
 with right_summary_col:
     border_color = "#38bdf8"
     
-    # 💡 串接後台根據即時數據動態生成的文本區塊
     ty_dynamic_report = "<br>".join(dynamic_ty_text_blocks)
-    
-    # 💡 串接 CWA API 的即時天氣與降雨變數
     temp_dynamic_report = f"目前屏東實測最高氣溫為 <b>{cwa_temperature}</b>。環境紫外線高、多雲偏曬，請戶外活動同仁適時補充水分、落實防曬保護。"
     rain_dynamic_report = f"依據即時水文觀測，平地城市全天累積雨量預估為 <b>{m_p24}</b>，山區部落則為 <b>{m_m24}</b>。整體水利防汛狀況安全穩定。"
 
-    # 💡 依據要求：標題徹底純粹修正為「勇式總結」
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
         <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 15px;">📊 勇式總結</div>
