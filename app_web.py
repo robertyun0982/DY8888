@@ -49,12 +49,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("⚡ 勇式防災網")
-
 # --- 🎯 3. 強制校對台灣時間 (UTC+8) ---
 tw_time = datetime.utcnow() + timedelta(hours=8)
 current_hour = tw_time.hour
 current_min = tw_time.minute
+
+# 🎯 升級：時間直接呈現在最上方的標題
+st.title(f"⚡ 勇式防災網 (台灣時間 {current_hour:02d}點{current_min:02d}分)")
 
 # --- 🌐 4. 多氣旋獨立物理路徑與動態演算核心 ---
 taiwan_lat, taiwan_lng = 22.67, 120.49 # 屏東守備指揮點
@@ -80,7 +81,7 @@ CYCLONE_DATA = {
     "熱帶低壓 TD09": {
         "current": {"lat": 17.5, "lng": 112.5, "info": "🌀 熱帶低壓 TD09 (南海西沙海面當前核心)"},
         "storm_radius_7": 150000,   # 當前7級風半徑 (150km)
-        "storm_radius_10": 0,       # 熱低壓無10級風核心
+        "storm_radius_10": 0,       
         "forecast": [
             {"lat": 18.5, "lng": 111.0, "info": "📅 TD09 - 第 1 天預測", "radius": 150000},
             {"lat": 19.6, "lng": 109.5, "info": "📅 TD09 - 第 2 天預測", "radius": 130000}, 
@@ -223,7 +224,6 @@ with left_main_col:
                 """, unsafe_allow_html=True)
 
     with map_col:
-        # 將包含所有颱風與低壓的完整字典序列化為 JSON 傳入前端 JavaScript
         cyclone_data_json = json.dumps(CYCLONE_DATA)
         
         html_map_code = f"""
@@ -247,15 +247,12 @@ with left_main_col:
                 var map = L.map('map', {{zoomControl: false}}).setView([21.0, 125.0], 5);
                 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{ attribution: 'Google Maps' }}).addTo(map);
 
-                // 讀取從後端傳入的完整多氣旋資料庫
                 var cyclones = {cyclone_data_json};
 
-                // 🎯 核心功能重大升級：使用自動化迴圈，確保所有颱風、低氣壓與未來擴充系統皆自動繪製完整的當前與未來 5 天預估圈
                 Object.keys(cyclones).forEach(function(name) {{
                     var c = cyclones[name];
                     var curr = c.current;
                     
-                    // 1. 繪製「當前」7級風暴風圈
                     if (c.storm_radius_7 > 0) {{
                         var color7 = name.includes("颱風") ? '#ef4444' : '#f59e0b';
                         L.circle([curr.lat, curr.lng], {{
@@ -263,23 +260,18 @@ with left_main_col:
                         }}).addTo(map).bindPopup("🔴 " + name + " [當前] 7級風暴風半徑: " + (c.storm_radius_7/1000) + "km");
                     }}
 
-                    // 2. 繪製「當前」10級風核心強風圈 (若有設定且大於 0)
                     if (c.storm_radius_10 > 0) {{
                         L.circle([curr.lat, curr.lng], {{
                             radius: c.storm_radius_10, color: '#b91c1c', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.35
                         }}).addTo(map).bindPopup("💀 " + name + " [當前] 10級風強風核心圈: " + (c.storm_radius_10/1000) + "km");
                     }}
 
-                    // 3. 循著預報軌跡劃出「未來 5 天」的點、路徑線段與對應預估暴風圈
                     var pathCoords = [[curr.lat, curr.lng]];
                     
                     c.forecast.forEach(function(pt) {{
                         pathCoords.push([pt.lat, pt.lng]);
-                        
-                        // 劃出預報點的小圓標記
                         L.circleMarker([pt.lat, pt.lng], {{radius: 5, color: '#0f172a', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1}}).addTo(map).bindPopup(pt.info);
                         
-                        // 劃出該預報時間點的預估暴風半徑圈
                         if (pt.radius > 0) {{
                             var fcColor = name.includes("颱風") ? '#a855f7' : '#38bdf8';
                             L.circle([pt.lat, pt.lng], {{
@@ -288,16 +280,13 @@ with left_main_col:
                         }}
                     }});
                     
-                    // 繪製路徑連接線
                     L.polyline(pathCoords, {{color: c.path_color, weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
                     
-                    // 繪製中心點大標記
                     var centerColor = name.includes("颱風") ? '#ef4444' : '#f59e0b';
                     var marker = L.circleMarker([curr.lat, curr.lng], {{ radius: 8, color: '#0f172a', weight: 2, fillColor: centerColor, fillOpacity: 1 }}).addTo(map).bindPopup(curr.info);
                     marker.bindTooltip(name.split(" (")[0], {{permanent: false, direction: 'top'}});
                 }});
 
-                // 4. 定位屏東守備防禦指揮點
                 L.circleMarker([{taiwan_lat}, {taiwan_lng}], {{ radius: 9, color: '#0f172a', weight: 2, fillColor: '#22c55e', fillOpacity: 1 }}).addTo(map).bindPopup("⚠️ 屏東守備防禦指揮點");
             </script>
         </body>
@@ -332,6 +321,7 @@ with right_summary_col:
     temp_dynamic_report = f"目前屏東實測最高氣溫為 <b>{cwa_temperature}</b>。環境紫外線高、多雲偏曬，請戶外活動同仁適時補充水分、落實防曬保護。"
     rain_dynamic_report = f"依據即時水文觀測，平地城市全天累積雨量預估為 <b>{m_p24}</b>，山區部落則為 <b>{m_m24}</b>。整體水利防汛狀況安全穩定。"
 
+    # 🎯 升級：移除底部原有的重複發布時間元件
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
         <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 15px;">📊 勇式總結</div>
@@ -348,8 +338,5 @@ with right_summary_col:
         {rain_dynamic_report}<br>
         👉 <i>提示：夏日午後容易伴隨局部突發性對流發展，若前往山區、河谷溪畔活動，仍需保持基礎警覺。</i>
         </p>
-        <div style="font-size:11px; color:#64748b; border-top:1px solid #1f2937; padding-top:8px; text-align:right; margin-top:20px;">
-            ⚡ 勇式最新發布時間：台灣時間 {current_hour:02d}點{current_min:02d}分
-        </div>
     </div>
     """, unsafe_allow_html=True)
