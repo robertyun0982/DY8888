@@ -130,11 +130,9 @@ for c_name, c_config in CYCLONE_DATA.items():
     c_dist = calculate_distance(taiwan_lat, taiwan_lng, c_config["current"]["lat"], c_config["current"]["lng"])
     if not c_config["has_threat"]:
         c_prob = 0.0
-        # ✨【徹底修正】將此處生成總結的舊字眼完全替換
         text_block = f"• <b>{c_name}</b>：當前距離 {int(c_dist)} 公里，經空間軌跡向性篩選，其路徑持續朝遠離本島方向撤離，預測侵台機率判定為 <b>0.0%</b>，已完全排除大氣直接威脅。"
     else:
         c_prob = max(3.0, min(95.0, round((c_config["base_factor"] / (c_dist + 1)) * 15, 1)))
-        # ✨【徹底修正】將此處生成總結的舊字眼完全替換
         text_block = f"• <b>{c_name}</b>：目前距離防守點約 {int(c_dist)} 公里，預測侵台機率為 <b>{c_prob}%</b>。數值反映其外圍環流變動，主要需防範其在遠洋海域移動時對周邊水氣的牽引影響。"
     
     processed_summary[c_name] = {"dist": int(c_dist), "prob": c_prob}
@@ -212,7 +210,7 @@ with left_main_col:
                 sum_info = processed_summary[t_name]
                 status_note = "<span style='color:#34d399;'>模式研判路徑無侵台威脅</span>" if sum_info['prob'] == 0.0 else "<span style='color:#f59e0b;'>留意遠洋外圍環流變動</span>"
                 
-                # ✨ 這裡也保持為正確的「預測侵台機率」
+                # 這裡原本有殘留的舊文字，已全數校正更換
                 st.markdown(f"""
                 <div style="background-color: #1e293b; padding: 6px; border-radius: 4px; margin-top: 5px; font-size: 11px; color: #e2e8f0; text-align: center; border: 1px solid #334155;">
                     🎯 當前中心距離：<b style="color:#e2e8f0;">{sum_info['dist']} km</b><br>
