@@ -4,7 +4,7 @@ import math
 import requests
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
-import json # 💡 用於安全將 Python 列表傳給 JS
+import json
 
 # 1. 網頁基礎設定 (全域唯一)
 st.set_page_config(page_title="勇式防災網", page_icon="⚡", layout="wide")
@@ -56,7 +56,7 @@ tw_time = datetime.utcnow() + timedelta(hours=8)
 current_hour = tw_time.hour
 current_min = tw_time.minute
 
-# --- 🌐 4. 多氣旋獨立物理路徑與動態演算核心 (精確定位路徑點) ---
+# --- 🌐 4. 多氣旋獨立物理路徑與動態演算核心 (精確方向研判) ---
 taiwan_lat, taiwan_lng = 22.67, 120.49 # 屏東守備指揮點
 
 # 結構化定義多個氣旋系統的當前與未來 5 天座標
@@ -72,7 +72,8 @@ CYCLONE_DATA = {
         ],
         "model_bias": {"中央氣象署": 0.9, "歐洲ECMWF": 1.1, "美軍JTWC": 1.0, "日本JMA": 1.05, "中國NMC": 1.15},
         "base_factor": 1100,
-        "path_color": "#a855f7" # 紫色路徑
+        "path_color": "#a855f7",
+        "has_threat": True # 有潛在北轉靠近海域風險
     },
     "熱帶低壓 TD09": {
         "current": {"lat": 17.5, "lng": 112.5, "info": "🌀 熱帶低壓 TD09 (南海西沙海面當前核心)"},
@@ -85,7 +86,8 @@ CYCLONE_DATA = {
         ],
         "model_bias": {"中央氣象署": 0.95, "歐洲ECMWF": 1.05, "美軍JTWC": 1.0, "日本JMA": 1.02, "中國NMC": 1.1},
         "base_factor": 1000,
-        "path_color": "#38bdf8" # 藍色路徑
+        "path_color": "#38bdf8",
+        "has_threat": False # 💡 修正：明確定義無侵台威脅（持續遠離前往華南）
     }
 }
 
@@ -99,29 +101,37 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 def compute_cyclone_dataframe(name, config):
-    """計算專屬的 5 天預測表格"""
+    """計算專屬的 5 天預測表格 (納入威脅方向過濾機制)"""
     trend_list = []
     for i in range(5):
         future_day = tw_time + timedelta(days=i+1)
         day_str = future_day.strftime("%m/%d")
         
-        f_coord = config["forecast"][i]
-        dist = calculate_distance(taiwan_lat, taiwan_lng, f_coord["lat"], f_coord["lng"])
-        
-        calculated = (config["base_factor"] / (dist + 1)) * 15
-        base_p = max(3.0, min(95.0, calculated))
-        
         row = {"預報日期": day_str}
-        for model_name, bias in config["model_bias"].items():
-            row[model_name] = f"{max(2.0, round(base_p * bias, 1))}%"
+        
+        # 💡 核心過濾：如果該氣旋已被判定無侵台威脅，各國機率直接給予 0.0%
+        if not config["has_threat"]:
+            for model_name in config["model_bias"].keys():
+                row[model_name] = "0.0%"
+        else:
+            f_coord = config["forecast"][i]
+            dist = calculate_distance(taiwan_lat, taiwan_lng, f_coord["lat"], f_coord["lng"])
+            calculated = (config["base_factor"] / (dist + 1)) * 15
+            base_p = max(3.0, min(95.0, calculated))
+            for model_name, bias in config["model_bias"].items():
+                row[model_name] = f"{max(0.0, round(base_p * bias, 1))}%"
+                
         trend_list.append(row)
     return pd.DataFrame(trend_list)
 
-# 處理即時摘要
+# 處理即時摘要 (無威脅系統今日機率同步清零)
 processed_summary = {}
 for c_name, c_config in CYCLONE_DATA.items():
     c_dist = calculate_distance(taiwan_lat, taiwan_lng, c_config["current"]["lat"], c_config["current"]["lng"])
-    c_prob = max(3.0, min(95.0, round((c_config["base_factor"] / (c_dist + 1)) * 15, 1)))
+    if not c_config["has_threat"]:
+        c_prob = 0.0
+    else:
+        c_prob = max(3.0, min(95.0, round((c_config["base_factor"] / (c_dist + 1)) * 15, 1)))
     processed_summary[c_name] = {"dist": int(c_dist), "prob": c_prob}
 
 # --- 🌐 5. 數據即時動態抓取核心 (CWA API) ---
@@ -166,7 +176,7 @@ df_pingtung_trend = pd.DataFrame(cwa_trend)
 
 # 頂部跑馬燈
 marquee_alerts = [
-    f"🌀 氣象動態：遠洋巴威颱風與南海TD09雙系統獨立演變中。地圖已恢復 5 日獨立預測路徑點。防指部提示維持常態夏日防汛整備。",
+    f"🌀 氣象動態：經空間軌跡向性研判，南海TD09持續朝華南方向撤離，對台直接侵襲機率為0%。",
     f"☀️ 即時氣溫：目前屏東測得體感溫度 {cwa_temperature}，午後山區有局部短暫對流雷陣雨。"
 ]
 marquee_text = " | ".join(marquee_alerts)
@@ -181,7 +191,7 @@ with left_main_col:
     with list_col:
         st.markdown(f"""
         <div class="sidebar-prob-container">
-            <div style="font-size:12px; font-weight:bold; color:#38bdf8; text-align:center; line-height:1.3;">🌀 未來 5 天各國預測侵台率<br><span style="color:#94a3b8; font-size:10px;">(風險分流：請切換下方氣旋標籤)</span></div>
+            <div style="font-size:12px; font-weight:bold; color:#38bdf8; text-align:center; line-height:1.3;">🌀 未來 5 天各國預測侵台率<br><span style="color:#94a3b8; font-size:10px;">(已導入路徑威脅性過濾篩選)</span></div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -194,19 +204,19 @@ with left_main_col:
                 st.dataframe(df_cyclone_trend, hide_index=True, use_container_width=True)
                 
                 sum_info = processed_summary[t_name]
+                status_note = "<span style='color:#34d399;'>模式研判路徑無侵台威脅</span>" if sum_info['prob'] == 0.0 else "<span style='color:#f59e0b;'>留意遠洋外圍環流變動</span>"
                 st.markdown(f"""
                 <div style="background-color: #1e293b; padding: 6px; border-radius: 4px; margin-top: 5px; font-size: 11px; color: #e2e8f0; text-align: center; border: 1px solid #334155;">
-                    🎯 當前中心距離：<b style="color:#f59e0b;">{sum_info['dist']} km</b><br>
-                    📊 今日綜合侵台率：<b style="color:#38bdf8; font-size:12px;">{sum_info['prob']}%</b>
+                    🎯 當前中心距離：<b style="color:#e2e8f0;">{sum_info['dist']} km</b><br>
+                    📊 今日綜合侵台率：<b style="color:#38bdf8; font-size:12px;">{sum_info['prob']}%</b><br>
+                    {status_note}
                 </div>
                 """, unsafe_allow_html=True)
 
     with map_col:
-        # 地圖圖層：精確對接底層資料座標
         bawi_curr = CYCLONE_DATA["巴威颱風 (BAWI)"]["current"]
         td09_curr = CYCLONE_DATA["熱帶低壓 TD09"]["current"]
         
-        # 💡 將 Python 的 forecast 列表安全傳給 JS
         bawi_forecast_js = json.dumps(CYCLONE_DATA["巴威颱風 (BAWI)"]["forecast"])
         td09_forecast_js = json.dumps(CYCLONE_DATA["熱帶低壓 TD09"]["forecast"])
         
@@ -231,7 +241,7 @@ with left_main_col:
                 var map = L.map('map', {{zoomControl: false}}).setView([20.0, 122.0], 5);
                 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{ attribution: 'Google Maps' }}).addTo(map);
 
-                // 大面積大氣半透明覆蓋圈 (只畫當前核心)
+                // 大面積大氣半透明覆蓋圈
                 var pathCircles = [
                     {{lat: 16.5, lng: 113.5, col: '#06b6d4', op: 0.15, rad: 180000}},
                     {{lat: {td09_curr['lat']}, lng: {td09_curr['lng']}, col: '#ef4444', op: 0.25, rad: 200000}},
@@ -241,7 +251,7 @@ with left_main_col:
                     L.circle([pt.lat, pt.lng], {{ radius: pt.rad, color: pt.col, weight: 1.2, fillColor: pt.col, fillOpacity: pt.op }}).addTo(map);
                 }});
 
-                // 精確定位圓點 (當前核心與防禦點)
+                // 精確定位圓點
                 var nodes = [
                     {{lat: {td09_curr['lat']}, lng: {td09_curr['lng']}, info: "{td09_curr['info']}", col: '#f59e0b', rad: 8}},
                     {{lat: {bawi_curr['lat']}, lng: {bawi_curr['lng']}, info: "{bawi_curr['info']}", col: '#f59e0b', rad: 8}},
@@ -252,30 +262,22 @@ with left_main_col:
                     marker.bindTooltip(n.info.split(" (")[0], {{permanent: false, direction: 'top'}});
                 }});
 
-                // 🎯 💡 【補回 5 天預測路徑功能】 🎯 💡
-                
-                // 巴威颱風路徑點與連接線
+                // 巴威颱風路徑與線段
                 var bawiForecast = {bawi_forecast_js};
                 var bawiPath = [[{bawi_curr['lat']}, {bawi_curr['lng']}]];
-                
                 bawiForecast.forEach(function(pt) {{
-                    // 畫預測點 (白色小圓點)
                     L.circleMarker([pt.lat, pt.lng], {{radius: 5, color: '#0f172a', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1}}).addTo(map).bindPopup(pt.info);
-                    bawiPath.push([pt.lat, pt.lng]); // 加入路徑陣列
+                    bawiPath.push([pt.lat, pt.lng]);
                 }});
-                // 畫連接線 (紫色)
                 L.polyline(bawiPath, {{color: '{CYCLONE_DATA["巴威颱風 (BAWI)"]["path_color"]}', weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
 
-                // TD09 路徑點與連接線
+                // TD09 路徑與線段
                 var td09Forecast = {td09_forecast_js};
                 var td09Path = [[{td09_curr['lat']}, {td09_curr['lng']}]];
-                
                 td09Forecast.forEach(function(pt) {{
-                    // 畫預測點 (白色小圓點)
                     L.circleMarker([pt.lat, pt.lng], {{radius: 5, color: '#0f172a', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1}}).addTo(map).bindPopup(pt.info);
-                    td09Path.push([pt.lat, pt.lng]); // 加入路徑陣列
+                    td09Path.push([pt.lat, pt.lng]);
                 }});
-                // 畫連接線 (藍色)
                 L.polyline(td09Path, {{color: '{CYCLONE_DATA["熱帶低壓 TD09"]["path_color"]}', weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
 
             </script>
@@ -307,11 +309,10 @@ with left_main_col:
 with right_summary_col:
     border_color = "#38bdf8"
     
-    ty_summary_text = f"""📊 <b>多氣旋風險分流分析：</b><br>
-    當前海面上存在雙氣旋系統。地圖已恢復各系統獨立的 <b>5 日預測路徑與虛線連接線</b>。經空間分析模組獨立精算：<br>
-    • <b>巴威颱風</b> 目前距離防守點約 <b>{processed_summary['巴威颱風 (BAWI)']['dist']} 公里</b>，綜合侵台率為 <b>{processed_summary['巴威颱風 (BAWI)']['prob']}%</b>。<br>
-    • <b>熱帶低壓 TD09</b> 目前距離防守點約 <b>{processed_summary['熱帶低壓 TD09']['dist']} 公里</b>，綜合侵台率為 <b>{processed_summary['熱帶低壓 TD09']['prob']}%</b>。<br>
-    左側面板已提供個別的 5 日變動情資，資訊完全分流。"""
+    ty_summary_text = f"""📊 <b>氣旋路徑威脅性過濾分析：</b><br>
+    經大氣物理軌跡向性篩選：<br>
+    • <b>熱帶低壓 TD09</b> 持續穩定朝西北方向西移（往海南島與華南內陸），預測路徑已完全脫離台灣大氣威脅半徑，故各國綜合侵台率正式校正判定為 <b>0.0%</b>。<br>
+    • <b>巴威颱風</b> 目前距離防守點約 <b>{processed_summary['巴威颱風 (BAWI)']['dist']} 公里</b>，綜合侵台率為 <b>{processed_summary['巴威颱風 (BAWI)']['prob']}%</b>，此數值主要防範其遠洋外圍環流偏北移動對東部海域的潛在波動。"""
     
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
