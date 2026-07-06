@@ -211,16 +211,18 @@ with left_main_col:
                     }).addTo(map);
                 });
 
-                // 🔴 徹底移除所有客製圖示標記，完全改用純粹的 L.circleMarker (定位圓點)
+                // 🔴 定位圓點 (包含當前核心、屏東防禦點、以及未來 5 天預測點)
                 var nodes = [
                     {lat: 21.0, lng: 118.5, info: "🌀 熱帶低壓 TD09 (當前核心位置)", col: '#f59e0b', rad: 8},
-                    {lat: 23.0, lng: 116.5, info: "熱帶低壓 TD09 (預報位置)", col: '#ffffff', rad: 5},
-                    {lat: 26.0, lng: 115.0, info: "熱帶低壓 TD09 (預報位置)", col: '#ffffff', rad: 5},
-                    
                     {lat: 17.5, lng: 137.5, info: "🌀 巴威颱風 (BAWI) (當前核心位置)", col: '#f59e0b', rad: 8},
-                    {lat: 17.6, lng: 134.0, info: "巴威颱風 (BAWI) (預報位置)", col: '#ffffff', rad: 5},
+                    {lat: 22.67, lng: 120.49, info: "⚠️ 屏東守備防禦指揮點", col: '#ef4444', rad: 9},
                     
-                    {lat: 22.67, lng: 120.49, info: "⚠️ 屏東守備防禦指揮點", col: '#ef4444', rad: 9}
+                    // 📅 未來 5 天預測移動位置點
+                    {lat: 23.0, lng: 116.5, info: "📅 第 1 天預測位置 (TD09外圍影響)", col: '#38bdf8', rad: 6},
+                    {lat: 25.0, lng: 114.5, info: "📅 第 2 天預測位置 (逐漸遠離)", col: '#34d399', rad: 6},
+                    {lat: 27.5, lng: 113.5, info: "📅 第 3 天預測位置 (朝內陸減弱)", col: '#a855f7', rad: 6},
+                    {lat: 29.5, lng: 113.0, info: "📅 第 4 天預測位置 (減弱為低壓)", col: '#94a3b8', rad: 6},
+                    {lat: 31.0, lng: 113.2, info: "📅 第 5 天預測位置 (消散完成)", col: '#64748b', rad: 6}
                 ];
 
                 nodes.forEach(function(n) {
@@ -232,7 +234,7 @@ with left_main_col:
                         fillOpacity: 1
                     }).addTo(map).bindPopup(n.info);
                     
-                    // 滑鼠懸停直接浮現名稱提示，防呆且清晰
+                    // 滑鼠懸停直接浮現預報名稱提示
                     marker.bindTooltip(n.info.split(" (")[0], {permanent: false, direction: 'top'});
                 });
             </script>
@@ -240,15 +242,6 @@ with left_main_col:
         </html>
         """
         components.html(html_map_code, height=520)
-        
-        st.markdown("""
-        <div style="background-color:#0f172a; border:1px solid #334155; padding:10px; border-radius:6px; margin-top:8px;">
-            <span style="font-size:11px; color:#94a3b8; font-weight:bold;">🌀 高確定性精準圖層動態說明：</span><br>
-            <span style="color:#f59e0b; font-size:12px;">●</span> <b style="font-size:12px;">黃色核心圓點：</b>代表 <b>巴威颱風 (BAWI)</b> 與 <b>熱帶低壓 TD09</b> 的即時中心定位點。<br>
-            <span style="color:#ef4444; font-size:12px;">●</span> <b style="font-size:12px;">紅色守備圓點：</b>代表屏東本地重點防禦指揮中心位置。<br>
-            <span style="color:#ef4444; font-size:12px;">●</span> <b style="font-size:12px;">高精準確定性路徑：</b>每一個巨型半透明侵襲圈皆精準切齊圓點經緯度，由深至淺呈現氣旋未來移動的線性軌跡。
-        </div>
-        """, unsafe_allow_html=True)
 
     with data_col:
         temp_color = "#38bdf8"
@@ -279,7 +272,7 @@ with right_summary_col:
     各國綜合評估平均侵台率已安全下修至 <b>{avg_prob}</b>，屬於常態低度警戒狀態。"""
     
     ty_action_text = "本地無須過度恐慌，維持常態性夏日防汛與防颱自主檢查即可。"
-    atmosphere_notes = f"<br>• 🌐 <b>未來大氣局局勢：</b>雖然氣旋不直接侵襲，但受外圍南方水氣輸送影響，明後兩天屏東山區的午後雷陣雨強度仍可能稍微增加。"
+    atmosphere_notes = f"<br>• 🌐 <b>未來大氣局勢：</b>雖然氣旋不直接侵襲，但受外圍南方水氣輸送影響，明後兩天屏東山區的午後雷陣雨強度仍可能稍微增加。"
     
     temp_summary_text = f"目前屏東實測最高氣溫維持在 <b>{cwa_temperature}</b>。整體呈現高溫多雲、紫外線指數偏高，出門民眾請記得適時補水與防曬。"
     
