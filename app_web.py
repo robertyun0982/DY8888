@@ -59,16 +59,18 @@ current_min = tw_time.minute
 # --- 🌐 4. 多氣旋獨立物理路徑與動態演算核心 ---
 taiwan_lat, taiwan_lng = 22.67, 120.49 # 屏東守備指揮點
 
-# 結構化定義多個氣旋系統的當前與未來 5 天座標
+# 結構化定義多個氣旋系統的當前與未來 5 天座標，並包含預估暴風半徑
 CYCLONE_DATA = {
     "巴威颱風 (BAWI)": {
         "current": {"lat": 17.5, "lng": 137.5, "info": "🌀 巴威颱風 (東部遠洋當前核心)"},
+        "storm_radius_7": 250000,   # 當前7級風半徑 (250km)
+        "storm_radius_10": 80000,   # 當前10級風半徑 (80km)
         "forecast": [
-            {"lat": 18.2, "lng": 134.0, "info": "📅 巴威 - 第 1 天預測"},
-            {"lat": 19.5, "lng": 130.0, "info": "📅 巴威 - 第 2 天預測"},
-            {"lat": 21.0, "lng": 127.0, "info": "📅 巴威 - 第 3 天預測"},
-            {"lat": 23.0, "lng": 125.2, "info": "📅 巴威 - 第 4 天預測"},
-            {"lat": 25.5, "lng": 124.0, "info": "📅 巴威 - 第 5 天預測"}
+            {"lat": 18.2, "lng": 134.0, "info": "📅 巴威 - 第 1 天預測", "radius": 250000},
+            {"lat": 19.5, "lng": 130.0, "info": "📅 巴威 - 第 2 天預測", "radius": 250000},
+            {"lat": 21.0, "lng": 127.0, "info": "📅 巴威 - 第 3 天預測", "radius": 260000}, # 預期未來稍放大
+            {"lat": 23.0, "lng": 125.2, "info": "📅 巴威 - 第 4 天預測", "radius": 280000}, # 接近沖繩/台灣東部時暴風圈擴大
+            {"lat": 25.5, "lng": 124.0, "info": "📅 巴威 - 第 5 天預測", "radius": 280000}
         ],
         "model_bias": {"中央氣象署": 0.9, "歐洲ECMWF": 1.1, "美軍JTWC": 1.0, "日本JMA": 1.05, "中國NMC": 1.15},
         "base_factor": 1100,
@@ -77,12 +79,14 @@ CYCLONE_DATA = {
     },
     "熱帶低壓 TD09": {
         "current": {"lat": 17.5, "lng": 112.5, "info": "🌀 熱帶低壓 TD09 (南海西沙海面當前核心)"},
+        "storm_radius_7": 150000,   
+        "storm_radius_10": 0,       
         "forecast": [
-            {"lat": 18.5, "lng": 111.0, "info": "📅 TD09 - 第 1 天預測"},
-            {"lat": 19.6, "lng": 109.5, "info": "📅 TD09 - 第 2 天預測"},
-            {"lat": 20.8, "lng": 108.2, "info": "📅 TD09 - 第 3 天預測"},
-            {"lat": 22.0, "lng": 106.8, "info": "📅 TD09 - 第 4 天預測"},
-            {"lat": 23.2, "lng": 105.5, "info": "📅 TD09 - 第 5 天預測"}
+            {"lat": 18.5, "lng": 111.0, "info": "📅 TD09 - 第 1 天預測", "radius": 150000},
+            {"lat": 19.6, "lng": 109.5, "info": "📅 TD09 - 第 2 天預測", "radius": 130000}, # 逐漸減弱減小
+            {"lat": 20.8, "lng": 108.2, "info": "📅 TD09 - 第 3 天預測", "radius": 100000},
+            {"lat": 22.0, "lng": 106.8, "info": "📅 TD09 - 第 4 天預測", "radius": 0}, # 登陸消散
+            {"lat": 23.2, "lng": 105.5, "info": "📅 TD09 - 第 5 天預測", "radius": 0}
         ],
         "model_bias": {"中央氣象署": 0.95, "歐洲ECMWF": 1.05, "美軍JTWC": 1.0, "日本JMA": 1.02, "中國NMC": 1.1},
         "base_factor": 1000,
@@ -208,9 +212,8 @@ with left_main_col:
                 st.dataframe(df_cyclone_trend, hide_index=True, use_container_width=True)
                 
                 sum_info = processed_summary[t_name]
-                status_note = "<span style='color:#34d399;'>模式研判路徑無侵台威脅</span>" if sum_info['prob'] == 0.0 else "<span style='color:#f59e0b;'>留意遠洋外圍環流變動</span>"
+                status_note = "<span style='color:#34d399;'>模式研判路徑無侵台威脅</span>" if sum_info['prob'] == 0.0 else "<span style='color:#f59e0b;'>⚠️ 請留意遠洋暴風圈變動</span>"
                 
-                # 這裡原本有殘留的舊文字，已全數校正更換
                 st.markdown(f"""
                 <div style="background-color: #1e293b; padding: 6px; border-radius: 4px; margin-top: 5px; font-size: 11px; color: #e2e8f0; text-align: center; border: 1px solid #334155;">
                     🎯 當前中心距離：<b style="color:#e2e8f0;">{sum_info['dist']} km</b><br>
@@ -222,8 +225,11 @@ with left_main_col:
     with map_col:
         bawi_curr = CYCLONE_DATA["巴威颱風 (BAWI)"]["current"]
         td09_curr = CYCLONE_DATA["熱帶低壓 TD09"]["current"]
-        bawi_forecast_js = json.dumps(CYCLONE_DATA["巴威颱風 (BAWI)"]["forecast"])
-        td09_forecast_js = json.dumps(CYCLONE_DATA["熱帶低壓 TD09"]["forecast"])
+        bawi_config = CYCLONE_DATA["巴威颱風 (BAWI)"]
+        td09_config = CYCLONE_DATA["熱帶低壓 TD09"]
+        
+        bawi_forecast_js = json.dumps(bawi_config["forecast"])
+        td09_forecast_js = json.dumps(td09_config["forecast"])
         
         html_map_code = f"""
         <!DOCTYPE html>
@@ -243,43 +249,69 @@ with left_main_col:
         <body>
             <div id="map"></div>
             <script>
-                var map = L.map('map', {{zoomControl: false}}).setView([20.0, 122.0], 5);
+                var map = L.map('map', {{zoomControl: false}}).setView([21.0, 125.0], 5);
                 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{ attribution: 'Google Maps' }}).addTo(map);
 
-                var pathCircles = [
-                    {{lat: 16.5, lng: 113.5, col: '#06b6d4', op: 0.15, rad: 180000}},
-                    {{lat: {td09_curr['lat']}, lng: {td09_curr['lng']}, col: '#ef4444', op: 0.25, rad: 200000}},
-                    {{lat: {bawi_curr['lat']}, lng: {bawi_curr['lng']}, col: '#ef4444', op: 0.30, rad: 240000}}
-                ];
-                pathCircles.forEach(function(pt) {{
-                    L.circle([pt.lat, pt.lng], {{ radius: pt.rad, color: pt.col, weight: 1.2, fillColor: pt.col, fillOpacity: pt.op }}).addTo(map);
-                }});
+                // ==================== 🌀 1. 巴威颱風 (當前與預報 5 天暴風半徑) ====================
+                // 當前實體暴風圈 (7級/10級)
+                L.circle([{bawi_curr['lat']}, {bawi_curr['lng']}], {{
+                    radius: {bawi_config['storm_radius_7']}, color: '#ef4444', weight: 2, fillColor: '#ef4444', fillOpacity: 0.18
+                }}).addTo(map).bindPopup("🔴 巴威颱風 [當前] 7級風暴風半徑: {int(bawi_config['storm_radius_7']/1000)}km");
 
+                L.circle([{bawi_curr['lat']}, {bawi_curr['lng']}], {{
+                    radius: {bawi_config['storm_radius_10']}, color: '#b91c1c', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.4
+                }}).addTo(map).bindPopup("💀 巴威颱風 [當前] 10級風核心圈: {int(bawi_config['storm_radius_10']/1000)}km");
+
+                // 🎯 核心功能升級：依據陣列動態循環劃出巴威未來 5 天預報點的暴風圈
+                var bawiForecast = {bawi_forecast_js};
+                var bawiPath = [[{bawi_curr['lat']}, {bawi_curr['lng']}]];
+                
+                bawiForecast.forEach(function(pt, idx) {{
+                    bawiPath.push([pt.lat, pt.lng]);
+                    // 畫出未來預報點標記
+                    L.circleMarker([pt.lat, pt.lng], {{radius: 5, color: '#0f172a', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1}}).addTo(map).bindPopup(pt.info);
+                    
+                    // 劃出預報暴風半徑 (採用更輕量化的半透明度避免干擾主圖)
+                    if(pt.radius > 0) {{
+                        L.circle([pt.lat, pt.lng], {{
+                            radius: pt.radius, color: '#a855f7', weight: 1, dashArray: '3, 4', fillColor: '#a855f7', fillOpacity: 0.05
+                        }}).addTo(map).bindPopup("🔮 " + pt.info.split(" - ")[1] + " 預估7級風半徑: " + (pt.radius/1000) + "km");
+                    }}
+                }});
+                L.polyline(bawiPath, {{color: '{bawi_config["path_color"]}', weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
+
+
+                // ==================== 🌀 2. 熱帶低壓 TD09 (當前與預報 5 天暴風半徑) ====================
+                L.circle([{td09_curr['lat']}, {td09_curr['lng']}], {{
+                    radius: {td09_config['storm_radius_7']}, color: '#f59e0b', weight: 1.5, fillColor: '#f59e0b', fillOpacity: 0.12
+                }}).addTo(map).bindPopup("🟡 TD09 熱帶低壓 [當前] 7級風半徑: {int(td09_config['storm_radius_7']/1000)}km");
+
+                var td09Forecast = {td09_forecast_js};
+                var td09Path = [[{td09_curr['lat']}, {td09_curr['lng']}]];
+                
+                td09Forecast.forEach(function(pt) {{
+                    td09Path.push([pt.lat, pt.lng]);
+                    L.circleMarker([pt.lat, pt.lng], {{radius: 5, color: '#0f172a', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1}}).addTo(map).bindPopup(pt.info);
+                    
+                    if(pt.radius > 0) {{
+                        L.circle([pt.lat, pt.lng], {{
+                            radius: pt.radius, color: '#38bdf8', weight: 1, dashArray: '3, 4', fillColor: '#38bdf8', fillOpacity: 0.03
+                        }}).addTo(map).bindPopup("🔮 " + pt.info.split(" - ")[1] + " 預估半徑: " + (pt.radius/1000) + "km");
+                    }}
+                }});
+                L.polyline(td09Path, {{color: '{td09_config["path_color"]}', weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
+
+
+                // ==================== ⚠️ 3. 守備據點節點資訊 ====================
                 var nodes = [
                     {{lat: {td09_curr['lat']}, lng: {td09_curr['lng']}, info: "{td09_curr['info']}", col: '#f59e0b', rad: 8}},
-                    {{lat: {bawi_curr['lat']}, lng: {bawi_curr['lng']}, info: "{bawi_curr['info']}", col: '#f59e0b', rad: 8}},
-                    {{lat: {taiwan_lat}, lng: {taiwan_lng}, info: "⚠️ 屏東守備防禦指揮點", col: '#ef4444', rad: 9}}
+                    {{lat: {bawi_curr['lat']}, lng: {bawi_curr['lng']}, info: "{bawi_curr['info']}", col: '#ef4444', rad: 8}},
+                    {{lat: {taiwan_lat}, lng: {taiwan_lng}, info: "⚠️ 屏東守備防禦指揮點", col: '#22c55e', rad: 9}}
                 ];
                 nodes.forEach(function(n) {{
                     var marker = L.circleMarker([n.lat, n.lng], {{ radius: n.rad, color: '#0f172a', weight: 2, fillColor: n.col, fillOpacity: 1 }}).addTo(map).bindPopup(n.info);
                     marker.bindTooltip(n.info.split(" (")[0], {{permanent: false, direction: 'top'}});
                 }});
-
-                var bawiForecast = {bawi_forecast_js};
-                var bawiPath = [[{bawi_curr['lat']}, {bawi_curr['lng']}]];
-                bawiForecast.forEach(function(pt) {{
-                    L.circleMarker([pt.lat, pt.lng], {{radius: 5, color: '#0f172a', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1}}).addTo(map).bindPopup(pt.info);
-                    bawiPath.push([pt.lat, pt.lng]);
-                }});
-                L.polyline(bawiPath, {{color: '{CYCLONE_DATA["巴威颱風 (BAWI)"]["path_color"]}', weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
-
-                var td09Forecast = {td09_forecast_js};
-                var td09Path = [[{td09_curr['lat']}, {td09_curr['lng']}]];
-                td09Forecast.forEach(function(pt) {{
-                    L.circleMarker([pt.lat, pt.lng], {{radius: 5, color: '#0f172a', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1}}).addTo(map).bindPopup(pt.info);
-                    td09Path.push([pt.lat, pt.lng]);
-                }});
-                L.polyline(td09Path, {{color: '{CYCLONE_DATA["熱帶低壓 TD09"]["path_color"]}', weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
             </script>
         </body>
         </html>
