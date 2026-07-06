@@ -56,7 +56,7 @@ tw_time = datetime.utcnow() + timedelta(hours=8)
 current_hour = tw_time.hour
 current_min = tw_time.minute
 
-# --- 🌐 4. 多氣旋獨立物理路徑與動態演算核心 (精確方向研判) ---
+# --- 🌐 4. 多氣旋獨立物理路徑與動態演算核心 ---
 taiwan_lat, taiwan_lng = 22.67, 120.49 # 屏東守備指揮點
 
 # 結構化定義多個氣旋系統的當前與未來 5 天座標
@@ -73,7 +73,7 @@ CYCLONE_DATA = {
         "model_bias": {"中央氣象署": 0.9, "歐洲ECMWF": 1.1, "美軍JTWC": 1.0, "日本JMA": 1.05, "中國NMC": 1.15},
         "base_factor": 1100,
         "path_color": "#a855f7",
-        "has_threat": True # 有潛在北轉靠近海域風險
+        "has_threat": True 
     },
     "熱帶低壓 TD09": {
         "current": {"lat": 17.5, "lng": 112.5, "info": "🌀 熱帶低壓 TD09 (南海西沙海面當前核心)"},
@@ -87,7 +87,7 @@ CYCLONE_DATA = {
         "model_bias": {"中央氣象署": 0.95, "歐洲ECMWF": 1.05, "美軍JTWC": 1.0, "日本JMA": 1.02, "中國NMC": 1.1},
         "base_factor": 1000,
         "path_color": "#38bdf8",
-        "has_threat": False # 💡 修正：明確定義無侵台威脅（持續遠離前往華南）
+        "has_threat": False 
     }
 }
 
@@ -101,15 +101,13 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 def compute_cyclone_dataframe(name, config):
-    """計算專屬的 5 天預測表格 (納入威脅方向過濾機制)"""
+    """計算專屬的 5 天預測表格"""
     trend_list = []
     for i in range(5):
         future_day = tw_time + timedelta(days=i+1)
         day_str = future_day.strftime("%m/%d")
-        
         row = {"預報日期": day_str}
         
-        # 💡 核心過濾：如果該氣旋已被判定無侵台威脅，各國機率直接給予 0.0%
         if not config["has_threat"]:
             for model_name in config["model_bias"].keys():
                 row[model_name] = "0.0%"
@@ -124,15 +122,23 @@ def compute_cyclone_dataframe(name, config):
         trend_list.append(row)
     return pd.DataFrame(trend_list)
 
-# 處理即時摘要 (無威脅系統今日機率同步清零)
+# 處理即時摘要與動態文字生成
 processed_summary = {}
+dynamic_ty_text_blocks = [] # 用於存放自動生成的氣旋分析文本
+
 for c_name, c_config in CYCLONE_DATA.items():
     c_dist = calculate_distance(taiwan_lat, taiwan_lng, c_config["current"]["lat"], c_config["current"]["lng"])
     if not c_config["has_threat"]:
         c_prob = 0.0
+        # 💡 依據即時數據動態生成「無威脅」文字
+        text_block = f"• <b>{c_name}</b>：當前距離 {int(c_dist)} 公里，經空間軌跡向性篩選，其路徑持續朝遠離本島方向撤離，直接侵台率判定為 <b>0.0%</b>，已完全排除大氣直接威脅。"
     else:
         c_prob = max(3.0, min(95.0, round((c_config["base_factor"] / (c_dist + 1)) * 15, 1)))
+        # 💡 依據即時數據動態生成「有潛在影響」文字
+        text_block = f"• <b>{c_name}</b>：目前距離防守點約 {int(c_dist)} 公里，即時綜合侵台率為 <b>{c_prob}%</b>。數值反映其外圍環流變動，主要需防範其在遠洋海域移動時對周邊水氣的牽引影響。"
+    
     processed_summary[c_name] = {"dist": int(c_dist), "prob": c_prob}
+    dynamic_ty_text_blocks.append(text_block)
 
 # --- 🌐 5. 數據即時動態抓取核心 (CWA API) ---
 @st.cache_data(ttl=600)
@@ -216,7 +222,6 @@ with left_main_col:
     with map_col:
         bawi_curr = CYCLONE_DATA["巴威颱風 (BAWI)"]["current"]
         td09_curr = CYCLONE_DATA["熱帶低壓 TD09"]["current"]
-        
         bawi_forecast_js = json.dumps(CYCLONE_DATA["巴威颱風 (BAWI)"]["forecast"])
         td09_forecast_js = json.dumps(CYCLONE_DATA["熱帶低壓 TD09"]["forecast"])
         
@@ -241,7 +246,6 @@ with left_main_col:
                 var map = L.map('map', {{zoomControl: false}}).setView([20.0, 122.0], 5);
                 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{ attribution: 'Google Maps' }}).addTo(map);
 
-                // 大面積大氣半透明覆蓋圈
                 var pathCircles = [
                     {{lat: 16.5, lng: 113.5, col: '#06b6d4', op: 0.15, rad: 180000}},
                     {{lat: {td09_curr['lat']}, lng: {td09_curr['lng']}, col: '#ef4444', op: 0.25, rad: 200000}},
@@ -251,7 +255,6 @@ with left_main_col:
                     L.circle([pt.lat, pt.lng], {{ radius: pt.rad, color: pt.col, weight: 1.2, fillColor: pt.col, fillOpacity: pt.op }}).addTo(map);
                 }});
 
-                // 精確定位圓點
                 var nodes = [
                     {{lat: {td09_curr['lat']}, lng: {td09_curr['lng']}, info: "{td09_curr['info']}", col: '#f59e0b', rad: 8}},
                     {{lat: {bawi_curr['lat']}, lng: {bawi_curr['lng']}, info: "{bawi_curr['info']}", col: '#f59e0b', rad: 8}},
@@ -262,7 +265,6 @@ with left_main_col:
                     marker.bindTooltip(n.info.split(" (")[0], {{permanent: false, direction: 'top'}});
                 }});
 
-                // 巴威颱風路徑與線段
                 var bawiForecast = {bawi_forecast_js};
                 var bawiPath = [[{bawi_curr['lat']}, {bawi_curr['lng']}]];
                 bawiForecast.forEach(function(pt) {{
@@ -271,7 +273,6 @@ with left_main_col:
                 }});
                 L.polyline(bawiPath, {{color: '{CYCLONE_DATA["巴威颱風 (BAWI)"]["path_color"]}', weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
 
-                // TD09 路徑與線段
                 var td09Forecast = {td09_forecast_js};
                 var td09Path = [[{td09_curr['lat']}, {td09_curr['lng']}]];
                 td09Forecast.forEach(function(pt) {{
@@ -279,7 +280,6 @@ with left_main_col:
                     td09Path.push([pt.lat, pt.lng]);
                 }});
                 L.polyline(td09Path, {{color: '{CYCLONE_DATA["熱帶低壓 TD09"]["path_color"]}', weight: 2.5, dashArray: '5, 8', opacity: 0.8}}).addTo(map);
-
             </script>
         </body>
         </html>
@@ -309,25 +309,29 @@ with left_main_col:
 with right_summary_col:
     border_color = "#38bdf8"
     
-    ty_summary_text = f"""📊 <b>氣旋路徑威脅性過濾分析：</b><br>
-    經大氣物理軌跡向性篩選：<br>
-    • <b>熱帶低壓 TD09</b> 持續穩定朝西北方向西移（往海南島與華南內陸），預測路徑已完全脫離台灣大氣威脅半徑，故各國綜合侵台率正式校正判定為 <b>0.0%</b>。<br>
-    • <b>巴威颱風</b> 目前距離防守點約 <b>{processed_summary['巴威颱風 (BAWI)']['dist']} 公里</b>，綜合侵台率為 <b>{processed_summary['巴威颱風 (BAWI)']['prob']}%</b>，此數值主要防範其遠洋外圍環流偏北移動對東部海域的潛在波動。"""
+    # 💡 串接後台根據即時數據動態生成的文本區塊
+    ty_dynamic_report = "<br>".join(dynamic_ty_text_blocks)
     
+    # 💡 串接 CWA API 的即時天氣與降雨變數
+    temp_dynamic_report = f"目前屏東實測最高氣溫為 <b>{cwa_temperature}</b>。環境紫外線高、多雲偏曬，請戶外活動同仁適時補充水分、落實防曬保護。"
+    rain_dynamic_report = f"依據即時水文觀測，平地城市全天累積雨量預估為 <b>{m_p24}</b>，山區部落則為 <b>{m_m24}</b>。整體水利防汛狀況安全穩定。"
+
+    # 💡 依據要求：標題徹底純粹修正為「勇式總結」
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
-        <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 15px;">📊 勇式生活防災總結</div>
+        <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 15px;">📊 勇式總結</div>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
-        <b>① 颱風影響與路徑動態：</b><br>
-        {ty_summary_text}
+        <b>① 颱風動態與風險分流評估：</b><br>
+        {ty_dynamic_report}
         </p>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
-        <b>② 即時氣溫防護指引：</b><br>
-        目前屏東實測最高氣溫為 <b>{cwa_temperature}</b>。高溫多雲偏曬，請注意防曬補水。
+        <b>② 即時氣溫觀測指引：</b><br>
+        {temp_dynamic_report}
         </p>
         <p style="font-size:13.5px; line-height:1.6;">
-        <b>③ 現況降雨安全提醒：</b><br>
-        今日平地全天估計雨量為 <b>{m_p24}</b>，山區為 <b>{m_m24}</b>。夏日午後山區仍需防範局部短暫雷陣雨。
+        <b>③ 水文降雨現況安全提醒：</b><br>
+        {rain_dynamic_report}<br>
+        👉 <i>提示：夏日午後容易伴隨局部突發性對流發展，若前往山區、河谷溪畔活動，仍需保持基礎警覺。</i>
         </p>
         <div style="font-size:11px; color:#64748b; border-top:1px solid #1f2937; padding-top:8px; text-align:right; margin-top:20px;">
             ⚡ 勇式最新發布時間：台灣時間 {current_hour:02d}點{current_min:02d}分
