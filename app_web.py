@@ -231,7 +231,6 @@ with left_main_col:
         </div>
         """, unsafe_allow_html=True)
         
-        # 結構穩定防崩潰：不論有沒有颱風，永遠保持穩定的固定元件數量
         if HAS_ACTIVE_CYCLONES:
             tab_titles = list(CYCLONE_DATA.keys())
             tabs = st.tabs(tab_titles)
@@ -260,6 +259,7 @@ with left_main_col:
     with map_col:
         cyclone_data_json = json.dumps(CYCLONE_DATA)
         
+        # 這裡所有的 JavaScript {} 大括號皆已改為 {{}} 雙大括號逃逸，完美避開 Python f-string 編譯錯誤
         html_map_code = f"""
         <!DOCTYPE html>
         <html>
@@ -280,29 +280,27 @@ with left_main_col:
 
                 var cyclones = {cyclone_data_json};
 
-                // 當中央氣象署 API 有資料時，才會動態渲染颱風圈與預報路徑
                 Object.keys(cyclones).forEach(function(name) {{
                     var c = cyclones[name];
                     var curr = c.current;
                     
-                    if (c.storm_radius_7 > 0) {
+                    if (c.storm_radius_7 > 0) {{
                         var color7 = name.includes("颱風") ? '#ef4444' : '#f59e0b';
                         L.circle([curr.lat, curr.lng], {{ radius: c.storm_radius_7, color: color7, weight: 2, fillColor: color7, fillOpacity: 0.16 }}).addTo(map);
-                    }
+                    }}
 
-                    if (c.storm_radius_10 > 0) {
+                    if (c.storm_radius_10 > 0) {{
                         L.circle([curr.lat, curr.lng], {{ radius: c.storm_radius_10, color: '#b91c1c', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.35 }}).addTo(map);
-                    }
+                    }}
 
                     var pathCoords = [[curr.lat, curr.lng]];
-                    c.forecast.forEach(function(pt) {
+                    c.forecast.forEach(function(pt) {{
                         pathCoords.push([pt.lat, pt.lng]);
                         L.circleMarker([pt.lat, pt.lng], {{radius: 4, color: '#ffffff', weight: 1, fillColor: '#000000', fillOpacity: 1}}).addTo(map);
-                    });
+                    }});
                     L.polyline(pathCoords, {{color: c.path_color, weight: 2, dashArray: '5, 8'}}).addTo(map);
                 }});
 
-                // 📌 屏東守備防禦指揮點：永久在地圖上清晰顯示
                 var defender = L.circleMarker([{taiwan_lat}, {taiwan_lng}], {{ radius: 9, color: '#ffffff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 }}).addTo(map);
                 defender.bindPopup("⚠️ 屏東守備防禦指揮點").openPopup();
             </script>
