@@ -76,118 +76,77 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-# --- 🌐 4. 全自動氣象署氣旋與低氣壓資料對接核心 ---
+# --- 🌐 4. 100% 真實氣象署開放資料動態解析 ---
 @st.cache_data(ttl=300)
-def fetch_active_cyclones(token):
-    """直接對接中央氣象署開放資料，兼顧颱風、熱帶低壓與一般低氣壓監測"""
+def fetch_real_cwa_cyclones(token):
+    """直接解析中央氣象署開放 API，僅載入真實存在的低氣壓/颱風資料與真實預報路徑"""
     cyclones = {}
-    is_official = False
-    
     try:
-        # 使用中央氣象署颱風動態與預報 API (W-C0034-001)
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/W-C0034-001?Authorization={token}"
         res = requests.get(url, timeout=5).json()
         
         if 'records' in res and 'tropicalCyclones' in res['records'] and res['records']['tropicalCyclones']:
             tc_list = res['records']['tropicalCyclones']['tropicalCyclone']
             for tc in tc_list:
-                name_en = tc.get('name', 'LOW')
-                name_zh = tc.get('cwaName', '熱帶性低氣壓')
-                full_name = f"{name_zh} ({name_en})"
+                name_en = tc.get('name', '')
+                name_zh = tc.get('cwaName', '熱帶系統/低氣壓')
+                full_name = f"{name_zh} ({name_en})" if name_en else name_zh
                 
                 analysis = tc.get('analysis', {})
                 pos = analysis.get('position', {})
                 lat = float(pos.get('latitude', 0))
                 lng = float(pos.get('longitude', 0))
                 
+                # 實測 7 級風與 10 級風半徑 (米)
                 storm_7 = float(analysis.get('radiusOf7ms', 0)) * 1000
                 storm_10 = float(analysis.get('radiusOf10ms', 0)) * 1000
                 
+                # 解析真實官方預報路徑點位
                 forecasts = []
                 fc_periods = tc.get('forecast', {}).get('forecastPeriod', [])
-                for idx, fp in enumerate(fc_periods[:5]):
+                for idx, fp in enumerate(fc_periods):
                     f_pos = fp.get('position', {})
                     f_lat = float(f_pos.get('latitude', 0))
                     f_lng = float(f_pos.get('longitude', 0))
                     f_radius = float(fp.get('radiusOf7ms', 0)) * 1000
-                    forecasts.append({
-                        "lat": f_lat, "lng": f_lng, "radius": f_radius if f_radius > 0 else storm_7,
-                        "info": f"📅 {name_zh} - 第 {idx+1} 天中央氣象署預測"
-                    })
+                    time_str = fp.get('forecastTime', f'預報時段 {idx+1}')
+                    if f_lat != 0 and f_lng != 0:
+                        forecasts.append({
+                            "lat": f_lat, 
+                            "lng": f_lng, 
+                            "radius": f_radius if f_radius > 0 else storm_7,
+                            "info": f"📅 {name_zh} - 氣象署官方預報點 ({time_str})"
+                        })
                 
                 if lat != 0 and lng != 0:
                     cyclones[full_name] = {
-                        "current": {"lat": lat, "lng": lng, "info": f"🌀 {full_name} 即時中心"},
+                        "current": {"lat": lat, "lng": lng, "info": f"🌀 {full_name} 氣象署觀測實測中心"},
                         "storm_radius_7": storm_7,
                         "storm_radius_10": storm_10,
                         "forecast": forecasts,
-                        "model_bias": {"中央氣象署": 1.0, "歐洲ECMWF": 1.02, "美軍JTWC": 0.98, "日本JMA": 1.01, "中國NMC": 1.04},
-                        "base_factor": 1100,
-                        "path_color": "#a855f7" if "颱風" in full_name else "#38bdf8",
-                        "has_threat": True
+                        "path_color": "#ef4444" if "颱風" in full_name else "#38bdf8"
                     }
-                    is_official = True
     except Exception as e:
         pass
 
-    # 補全機制：若官方尚未編號警報，但台灣周邊有低氣壓環流時自動載入低壓帶監測
-    if not cyclones:
-        low_pressure_name = "台灣周邊低氣壓環流 (Low Pressure)"
-        cyclones[low_pressure_name] = {
-            "current": {"lat": 20.5, "lng": 124.0, "info": "☁️ 台灣附近低氣壓環流中心"},
-            "storm_radius_7": 150000, 
-            "storm_radius_10": 0,
-            "forecast": [
-                {"lat": 21.5, "lng": 123.0, "radius": 150000, "info": "預測移動路徑 Day 1"},
-                {"lat": 22.5, "lng": 122.0, "radius": 150000, "info": "預測移動路徑 Day 2"},
-                {"lat": 23.5, "lng": 121.5, "radius": 150000, "info": "預測移動路徑 Day 3"},
-            ],
-            "model_bias": {"中央氣象署": 1.0, "歐洲ECMWF": 1.01, "美軍JTWC": 0.99, "日本JMA": 1.00, "中國NMC": 1.02},
-            "base_factor": 600,
-            "path_color": "#0ea5e9",
-            "has_threat": False
-        }
+    return cyclones
 
-    return cyclones, is_official
-
-# 自動擷取系統資料
-CYCLONE_DATA, IS_OFFICIAL_ALERT = fetch_active_cyclones(CWA_TOKEN)
+# 載入真實資料
+CYCLONE_DATA = fetch_real_cwa_cyclones(CWA_TOKEN)
 HAS_ACTIVE_CYCLONES = len(CYCLONE_DATA) > 0
-
-def compute_cyclone_dataframe(name, config):
-    trend_list = []
-    for i in range(5):
-        future_day = tw_time + timedelta(days=i+1)
-        day_str = future_day.strftime("%m/%d")
-        row = {"預報日期": day_str}
-        
-        if i < len(config["forecast"]):
-            f_coord = config["forecast"][i]
-            dist = calculate_distance(taiwan_lat, taiwan_lng, f_coord["lat"], f_coord["lng"])
-            calculated = (config["base_factor"] / (dist + 1)) * 15
-            base_p = max(3.0, min(95.0, calculated))
-            for model_name, bias in config["model_bias"].items():
-                row[model_name] = f"{max(0.0, round(base_p * bias, 1))}%"
-        else:
-            for model_name in config["model_bias"].keys():
-                row[model_name] = "0.0%"
-        trend_list.append(row)
-    return pd.DataFrame(trend_list)
 
 processed_summary = {}
 dynamic_ty_text_blocks = [] 
 
-for c_name, c_config in CYCLONE_DATA.items():
-    c_dist = calculate_distance(taiwan_lat, taiwan_lng, c_config["current"]["lat"], c_config["current"]["lng"])
-    c_prob = max(3.0, min(95.0, round((c_config["base_factor"] / (c_dist + 1)) * 15, 1)))
-    
-    if IS_OFFICIAL_ALERT:
-        text_block = f"• <b>{c_name}</b>：目前距離防守點約 {int(c_dist)} 公里。依中央氣象署最新環流軌跡研判，侵台機率預估為 <b>{c_prob}%</b>。請隨時注意官方發布之警報。"
-    else:
-        text_block = f"• <b>{c_name}</b>：台灣附近目前有低氣壓系統發展中（距離約 {int(c_dist)} 公里）。雖然強度尚未達颱風標準，但其外圍水氣仍可能造成南部與山區突發對流降雨。"
+if HAS_ACTIVE_CYCLONES:
+    for c_name, c_config in CYCLONE_DATA.items():
+        c_dist = calculate_distance(taiwan_lat, taiwan_lng, c_config["current"]["lat"], c_config["current"]["lng"])
         
-    processed_summary[c_name] = {"dist": int(c_dist), "prob": c_prob}
-    dynamic_ty_text_blocks.append(text_block)
+        text_block = f"• <b>{c_name}</b>：氣象署實測中心座標（緯度 {c_config['current']['lat']}°, 經度 {c_config['current']['lng']}°），目前距離屏東指揮點約 <b>{int(c_dist)} 公里</b>。包含 {len(c_config['forecast'])} 個官方預報定位點。"
+        processed_summary[c_name] = {"dist": int(c_dist), "fc_count": len(c_config["forecast"])}
+        dynamic_ty_text_blocks.append(text_block)
+else:
+    dynamic_ty_text_blocks.append("• <b>當前海域動態</b>：依中央氣象署最新開放資料，目前臺灣周遭海域<b>無列管之活躍低壓或颱風警報點位</b>。")
 
 # --- 🌐 5. 數據即時動態抓取核心 (CWA API 降雨與氣溫) ---
 @st.cache_data(ttl=600)
@@ -230,15 +189,15 @@ m_m12, m_m24 = cwa_rain["m12"], cwa_rain["m24"]
 df_pingtung_trend = pd.DataFrame(cwa_trend)
 
 # 頂部跑馬燈
-if IS_OFFICIAL_ALERT:
+if HAS_ACTIVE_CYCLONES:
     marquee_alerts = [
-        f"⚠️ 氣象通報：中央氣象署發布颱風/熱帶低壓警報動態，請防汛單位加強應變整備。",
+        f"⚠️ 氣象通報：中央氣象署已有動態列管熱帶系統，請防汛單位注意動向。",
         f"🌧️ 即時雨量：平地目前累積雨量 {m_p12}，山區部落累積雨量 {m_m12}。"
     ]
 else:
     marquee_alerts = [
-        f"☁️ 天氣通報：今日（{month}月{day}日）臺灣周邊受低氣壓環流影響，請留意局部大氣變化。",
-        f"🌡️ 屏東氣溫 {cwa_temperature}，夏日午後山區及溪谷請防範短暫雷陣雨。"
+        f"☀️ 天氣通報：今日（{month}月{day}日）氣象署開放資料顯示周邊無活躍列管氣旋。",
+        f"🌡️ 屏東實測氣溫 {cwa_temperature}，夏日午後請留意局部雷陣雨。"
     ]
 marquee_text = " | ".join(marquee_alerts)
 st.markdown(f'<div class="marquee-box"><marquee scrollamount="6">{marquee_text}</marquee></div>', unsafe_allow_html=True)
@@ -252,22 +211,34 @@ with left_main_col:
     with list_col:
         st.markdown(f"""
         <div class="sidebar-prob-container">
-            <div style="font-size:12px; font-weight:bold; color:#38bdf8; text-align:center; line-height:1.3;">🌀 大氣系統路徑與機率評估<br><span style="color:#94a3b8; font-size:10px;">(中央氣象署核心對接)</span></div>
+            <div style="font-size:12px; font-weight:bold; color:#38bdf8; text-align:center; line-height:1.3;">🌀 中央氣象署實測監測清單<br><span style="color:#94a3b8; font-size:10px;">(100% 官方 API 直連)</span></div>
         </div>
         """, unsafe_allow_html=True)
         
-        tab_titles = list(CYCLONE_DATA.keys())
-        tabs = st.tabs(tab_titles)
-        for idx, t_name in enumerate(tab_titles):
-            with tabs[idx]:
-                df_cyclone_trend = compute_cyclone_dataframe(t_name, CYCLONE_DATA[t_name])
-                st.dataframe(df_cyclone_trend, hide_index=True, use_container_width=True)
-                sum_info = processed_summary[t_name]
-                st.markdown(f"""
-                <div style="background-color: #1e293b; padding: 6px; border-radius: 4px; margin-top: 5px; font-size: 11px; color: #e2e8f0; text-align: center; border: 1px solid #334155;">
-                    🎯 中心定位距離：<b style="color:#e2e8f0;">{sum_info['dist']} km</b><br>
-                    📊 綜合防衛影響率：<b style="color:#38bdf8; font-size:12px;">{sum_info['prob']}%</b><br>
-                    <span style='color:#f59e0b;'>⚠️ 請密切注意局部降雨變化</span>
+        if HAS_ACTIVE_CYCLONES:
+            tab_titles = list(CYCLONE_DATA.keys())
+            tabs = st.tabs(tab_titles)
+            for idx, t_name in enumerate(tab_titles):
+                with tabs[idx]:
+                    c_info = CYCLONE_DATA[t_name]
+                    sum_info = processed_summary[t_name]
+                    
+                    # 顯示實測點資料
+                    st.markdown(f"""
+                    <div style="background-color: #1e293b; padding: 10px; border-radius: 6px; font-size: 11.5px; color: #e2e8f0; border: 1px solid #334155; line-height:1.6;">
+                        📍 <b>實測中心緯度：</b> {c_info['current']['lat']}° N<br>
+                        📍 <b>實測中心經度：</b> {c_info['current']['lng']}° E<br>
+                        🎯 <b>距屏東距離：</b> <b style="color:#38bdf8;">{sum_info['dist']} km</b><br>
+                        🔮 <b>官方預報點數：</b> {sum_info['fc_count']} 個點<br>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            tabs = st.tabs(["海域無列管氣旋"])
+            with tabs[0]:
+                st.markdown("""
+                <div style="background-color:#1e293b; padding:25px 10px; border-radius:6px; text-align:center; color:#94a3b8; font-size:12px; border:1px dashed #334155; margin-top:5px; line-height:1.6;">
+                    🍃 <b>氣象署無列管氣旋點位</b><br>
+                    目前官方 API 未發布氣旋或低壓路徑座標。
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -298,21 +269,30 @@ with left_main_col:
                     var c = cyclones[name];
                     var curr = c.current;
                     
+                    // 繪製中心點
+                    var centerMarker = L.circleMarker([curr.lat, curr.lng], {{
+                        radius: 7, color: '#ffffff', weight: 2, fillColor: c.path_color, fillOpacity: 0.9
+                    }}).addTo(map);
+                    centerMarker.bindPopup(curr.info);
+
+                    // 繪製風圈/水氣涵蓋範圍 (若氣象署有提供)
                     if (c.storm_radius_7 > 0) {{
-                        var color7 = name.includes("颱風") ? '#ef4444' : '#38bdf8';
-                        L.circle([curr.lat, curr.lng], {{ radius: c.storm_radius_7, color: color7, weight: 2, fillColor: color7, fillOpacity: 0.16 }}).addTo(map);
+                        L.circle([curr.lat, curr.lng], {{ radius: c.storm_radius_7, color: c.path_color, weight: 1.5, fillColor: c.path_color, fillOpacity: 0.15 }}).addTo(map);
                     }}
-
                     if (c.storm_radius_10 > 0) {{
-                        L.circle([curr.lat, curr.lng], {{ radius: c.storm_radius_10, color: '#b91c1c', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.35 }}).addTo(map);
+                        L.circle([curr.lat, curr.lng], {{ radius: c.storm_radius_10, color: '#b91c1c', weight: 2, fillColor: '#b91c1c', fillOpacity: 0.3 }}).addTo(map);
                     }}
 
-                    var pathCoords = [[curr.lat, curr.lng]];
-                    c.forecast.forEach(function(pt) {{
-                        pathCoords.push([pt.lat, pt.lng]);
-                        L.circleMarker([pt.lat, pt.lng], {{radius: 4, color: '#ffffff', weight: 1, fillColor: '#000000', fillOpacity: 1}}).addTo(map);
-                    }});
-                    L.polyline(pathCoords, {{color: c.path_color, weight: 2, dashArray: '5, 8'}}).addTo(map);
+                    // 繪製官方真實預報路徑線
+                    if (c.forecast && c.forecast.length > 0) {{
+                        var pathCoords = [[curr.lat, curr.lng]];
+                        c.forecast.forEach(function(pt) {{
+                            pathCoords.push([pt.lat, pt.lng]);
+                            var fMarker = L.circleMarker([pt.lat, pt.lng], {{radius: 4, color: '#ffffff', weight: 1, fillColor: '#000000', fillOpacity: 0.8}}).addTo(map);
+                            fMarker.bindPopup(pt.info);
+                        }});
+                        L.polyline(pathCoords, {{color: c.path_color, weight: 2, dashArray: '5, 8'}}).addTo(map);
+                    }}
                 }});
 
                 var defender = L.circleMarker([{taiwan_lat}, {taiwan_lng}], {{ radius: 9, color: '#ffffff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 }}).addTo(map);
@@ -347,14 +327,14 @@ with right_summary_col:
     border_color = "#38bdf8"
     
     ty_dynamic_report = "<br>".join(dynamic_ty_text_blocks)
-    temp_dynamic_report = f"目前屏東實測最高氣溫為 <b>{cwa_temperature}</b>。環境紫外線強、體感偏熱，請戶外活動同仁適時補充水分。"
+    temp_dynamic_report = f"目前屏東實測最高氣溫為 <b>{cwa_temperature}</b>。體感偏熱，請戶外活動同仁適時補充水分。"
     rain_dynamic_report = f"依據即時水文觀測，平地城市全天累積雨量預估為 <b>{m_p24}</b>，山區部落則為 <b>{m_m12}</b>。水利狀況穩定。"
 
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
         <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 15px;">📊 勇式總結</div>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
-        <b>① 大氣動態與風險評估：</b><br>
+        <b>① 大氣氣旋/低壓動態評估：</b><br>
         {ty_dynamic_report}
         </p>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
@@ -364,7 +344,7 @@ with right_summary_col:
         <p style="font-size:13.5px; line-height:1.6;">
         <b>③ 水文降雨現況安全提醒：</b><br>
         {rain_dynamic_report}<br>
-        👉 <i>提示：低壓環流易伴隨局部突發性對流，前往山區或溪畔活動請注意天色變化。</i>
+        👉 <i>提示：前往山區或溪畔活動請注意天色變化與午後雷陣雨。</i>
         </p>
     </div>
     """, unsafe_allow_html=True)
