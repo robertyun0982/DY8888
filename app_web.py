@@ -12,7 +12,7 @@ st.set_page_config(page_title="勇式防災網", page_icon="⚡", layout="wide")
 # 金鑰對接
 CWA_TOKEN = "CWA-21A6E335-B671-4A06-82CC-1AD7B103CEF5"
 
-# --- 🚀 2. 專用 CSS 樣式控制 ---
+# --- 🚀 2. CSS 樣式控制 ---
 st.markdown("""
     <style>
         .block-container {
@@ -76,38 +76,59 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 def parse_cwa_position(pos_data):
-    """解析氣象署各式 API 座標結構 (支援 dict 與 list)"""
+    """解析氣象署各式 API 座標結構 (支援 dict, list, string)"""
     lat, lng = 0.0, 0.0
     if isinstance(pos_data, dict):
         lat = float(pos_data.get('latitude', pos_data.get('lat', 0)))
         lng = float(pos_data.get('longitude', pos_data.get('lng', 0)))
     elif isinstance(pos_data, list) and len(pos_data) >= 2:
-        # 開放資料若傳回陣列，常以 [經度, 緯度] 呈現
         val1, val2 = float(pos_data[0]), float(pos_data[1])
-        if val1 > 100:  # 經度通常大於 100
+        if val1 > 100:
+            lng, lat = val1, val2
+        else:
+            lat, lng = val1, val2
+    elif isinstance(pos_data, str) and ',' in pos_data:
+        parts = pos_data.split(',')
+        val1, val2 = float(parts[0]), float(parts[1])
+        if val1 > 100:
             lng, lat = val1, val2
         else:
             lat, lng = val1, val2
     return lat, lng
 
-# --- 🌐 4. 修正版氣象署開放資料解析函數 ---
-@st.cache_data(ttl=180)
+# --- 🌐 4. 雙源氣象署熱帶系統動態解析 ---
+@st.cache_data(ttl=60)
 def fetch_real_cwa_cyclones(token):
-    """精準解析中央氣象署 API 中的經緯度座標與真實預報路徑"""
+    """同時自動備援讀取 W-C0034-001 與 W-C0035-001 確保 TD 與颱風座標均可精準載入"""
     cyclones = {}
-    try:
-        url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/W-C0034-001?Authorization={token}"
-        res = requests.get(url, timeout=5).json()
-        
-        if 'records' in res and 'tropicalCyclones' in res['records']:
-            tc_data = res['records']['tropicalCyclones']
-            tc_list = tc_data.get('tropicalCyclone', []) if isinstance(tc_data, dict) else []
+    
+    # 嘗試的資料集優先順序
+    datasets = ["W-C0034-001", "W-C0035-001"]
+    
+    for ds in datasets:
+        try:
+            url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/{ds}?Authorization={token}"
+            res = requests.get(url, timeout=5).json()
             
+            records = res.get('records', {})
+            tc_data = records.get('tropicalCyclones', records.get('tropicalCyclone', []))
+            
+            if isinstance(tc_data, dict):
+                tc_list = tc_data.get('tropicalCyclone', [])
+            elif isinstance(tc_data, list):
+                tc_list = tc_data
+            else:
+                tc_list = []
+                
             for tc in tc_list:
                 name_en = tc.get('name', '')
-                name_zh = tc.get('cwaName', '熱帶氣旋/TD')
+                name_zh = tc.get('cwaName', tc.get('typhoonName', '熱帶性低氣壓(TD)'))
                 full_name = f"{name_zh} ({name_en})" if name_en else name_zh
                 
+                # 如果已經抓過同名系統則跳過
+                if full_name in cyclones:
+                    continue
+
                 analysis = tc.get('analysis', {})
                 pos_data = analysis.get('position', {})
                 lat, lng = parse_cwa_position(pos_data)
@@ -132,18 +153,18 @@ def fetch_real_cwa_cyclones(token):
                 
                 if lat != 0 and lng != 0:
                     cyclones[full_name] = {
-                        "current": {"lat": lat, "lng": lng, "info": f"🌀 {full_name} 即時觀測中心"},
+                        "current": {"lat": lat, "lng": lng, "info": f"🌀 {full_name} 即時實測中心"},
                         "storm_radius_7": storm_7,
                         "storm_radius_10": storm_10,
                         "forecast": forecasts,
                         "path_color": "#ef4444" if "颱風" in full_name else "#f59e0b"
                     }
-    except Exception as e:
-        pass
+        except Exception as e:
+            continue
 
     return cyclones
 
-# 載入資料
+# 載入真實資料
 CYCLONE_DATA = fetch_real_cwa_cyclones(CWA_TOKEN)
 HAS_ACTIVE_CYCLONES = len(CYCLONE_DATA) > 0
 
@@ -153,11 +174,11 @@ dynamic_ty_text_blocks = []
 if HAS_ACTIVE_CYCLONES:
     for c_name, c_config in CYCLONE_DATA.items():
         c_dist = calculate_distance(taiwan_lat, taiwan_lng, c_config["current"]["lat"], c_config["current"]["lng"])
-        text_block = f"• <b>{c_name}</b>：中心定位為 <b>北緯 {c_config['current']['lat']}°，東經 {c_config['current']['lng']}°</b>，距屏東約 <b>{int(c_dist)} 公里</b>。內含 {len(c_config['forecast'])} 個官方預報節點。"
+        text_block = f"• <b>{c_name}</b>：中心定位為 <b>北緯 {c_config['current']['lat']}°，東經 {c_config['current']['lng']}°</b>，距屏東約 <b>{int(c_dist)} 公里</b>。包含 {len(c_config['forecast'])} 個預報定位節點。"
         processed_summary[c_name] = {"dist": int(c_dist), "fc_count": len(c_config["forecast"])}
         dynamic_ty_text_blocks.append(text_block)
 else:
-    dynamic_ty_text_blocks.append("• <b>當前海域動態</b>：經對接中央氣象署 API，開放資料庫尚未寫入正式熱帶性低氣壓(TD)或颱風座標。若氣象署剛發布最新簡報，請點擊右上角「🔄 強制刷新最新數據」。")
+    dynamic_ty_text_blocks.append("• <b>當前海域動態</b>：經雙重 API 查詢，目前氣象署 Open Data 尚未拋出正式熱帶性低氣壓(TD)定位檔。點擊右上角「🔄 強制刷新最新數據」可隨時更新。")
 
 # --- 🌐 5. 降雨與氣溫動態資料 ---
 @st.cache_data(ttl=300)
@@ -202,12 +223,12 @@ df_pingtung_trend = pd.DataFrame(cwa_trend)
 # 跑馬燈
 if HAS_ACTIVE_CYCLONES:
     marquee_alerts = [
-        f"⚠️ 氣象通報：中央氣象署已更新熱帶氣旋/TD即時路徑，請防汛單位注意動態。",
+        f"⚠️ 氣象通報：[交通部中央氣象署](hovercard{{place_id:ChIJWXOC95-pQjQR-FhcVbny6V8}})已同步更新熱帶性低氣壓(TD)/颱風最新路徑，請做好防汛準備。",
         f"🌧️ 即時雨量：屏東平地累積雨量 {m_p12}，山區部落累積雨量 {m_m12}。"
     ]
 else:
     marquee_alerts = [
-        f"☀️ 天氣通報：今日（{month}月{day}日）開放 API 尚無列管 TD 點位，點擊右上角按鈕可即時重測。",
+        f"☀️ 天氣通報：今日（{month}月{day}日）開放 API 尚無最新 TD 定位檔，點擊右上角按鈕可即時重測。",
         f"🌡️ 屏東實測氣溫 {cwa_temperature}，夏日午後請留意局部雷陣雨。"
     ]
 marquee_text = " | ".join(marquee_alerts)
@@ -222,7 +243,7 @@ with left_main_col:
     with list_col:
         st.markdown(f"""
         <div class="sidebar-prob-container">
-            <div style="font-size:12px; font-weight:bold; color:#38bdf8; text-align:center; line-height:1.3;">🌀 中央氣象署實測清單<br><span style="color:#94a3b8; font-size:10px;">(100% API 經緯度校對)</span></div>
+            <div style="font-size:12px; font-weight:bold; color:#38bdf8; text-align:center; line-height:1.3;">🌀 中央氣象署實測清單<br><span style="color:#94a3b8; font-size:10px;">(雙源 API 自動備援)</span></div>
         </div>
         """, unsafe_allow_html=True)
         
