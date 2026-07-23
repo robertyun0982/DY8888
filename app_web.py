@@ -13,8 +13,12 @@ st.set_page_config(page_title="勇式防災網", page_icon="⚡", layout="wide")
 # 氣象署 Open Data API Key
 CWA_TOKEN = "CWA-21A6E335-B671-4A06-82CC-1AD7B103CEF5"
 
-# --- 🚀 2. CSS 樣式控制 ---
+# --- 🚀 2. CSS 樣式與自動重新整理 Meta 設定 ---
+# 加入 meta refresh，確保前端網頁即使開著也會每 60 秒背景自動重載最新資料
 st.markdown("""
+    <head>
+        <meta http-equiv="refresh" content="60">
+    </head>
     <style>
         .block-container {
             padding-top: 1.5rem !important; 
@@ -76,12 +80,11 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-# --- 🌐 4. 熱帶低壓 (TD13) 及其未來 5 天路徑解析 ---
+# --- 🌐 4. 熱帶低壓 (TD13) 及其未來 5 天路徑動態解析 ---
 @st.cache_data(ttl=60)
 def fetch_real_cwa_cyclones(token):
     cyclones = {}
     
-    # TD13 當前中心定位及未來 5 天預測路徑點 (依據太平洋高壓導引西行路徑)
     c_name = "熱帶性低氣壓 TD13 (紅霞趨勢)"
     
     # 未來 5 天預測點路徑資料 (當前 -> 24h -> 48h -> 72h -> 96h)
@@ -100,7 +103,7 @@ def fetch_real_cwa_cyclones(token):
             "info": f"🌀 <b>{c_name}</b><br>近中心風速: 15 m/s<br>現正朝西北西移動"
         },
         "path_points": forecast_path,
-        "storm_radius_7": 180000, # 外圍暴風警戒範圍
+        "storm_radius_7": 180000, # 外圍暴風警戒範圍 (180 km)
         "path_color": "#f59e0b"
     }
 
@@ -221,7 +224,7 @@ with left_main_col:
                         var coord = [pt.lat, pt.lng];
                         latlngs.push(coord);
                         
-                        // 繪製路徑點
+                        // 繪製預測路徑點與標籤
                         var isCurrent = (index === 0);
                         L.circleMarker(coord, {{
                             radius: isCurrent ? 10 : 6,
@@ -232,14 +235,14 @@ with left_main_col:
                         }}).addTo(map).bindPopup("<b>" + pt.time + "</b><br>" + pt.desc);
                     }});
 
-                    // 繪製 5 天動態預測折線
+                    // 繪製 5 天動態預測虛線路徑
                     L.polyline(latlngs, {{
                         color: '#f59e0b',
                         weight: 3,
                         dashArray: '6, 6'
                     }}).addTo(map);
 
-                    // 繪製警戒暴風圈
+                    // 繪製當前暴風警戒圈
                     var curr = c.current;
                     L.circle([curr.lat, curr.lng], {{
                         radius: c.storm_radius_7,
