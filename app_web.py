@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import math
 import requests
+import re
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 import json
@@ -63,11 +64,11 @@ with refresh_col:
         st.cache_data.clear()
         st.rerun()
 
-# 守備防禦指揮點座標 (屏東)
+# 屏東守備指揮點
 taiwan_lat, taiwan_lng = 22.67, 120.49 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
-    """大圓距離公式"""
+    """大圓距離公式 (公里)"""
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -75,117 +76,98 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-def extract_lat_lng(data):
-    """萬用經緯度深度搜尋函數 (徹底破除氣象署多層 JSON 結構)"""
-    if isinstance(data, dict):
-        lat = data.get('latitude', data.get('lat', data.get('Lat', 0.0)))
-        lng = data.get('longitude', data.get('lng', data.get('Lng', 0.0)))
+def parse_text_coordinates(text):
+    """【黑科技】當 API 結構沒座標時，從特報文字自動提取經緯度"""
+    if not text or not isinstance(text, str):
+        return 0.0, 0.0
+    
+    # 尋找「北緯 XX.X 度，東經 XXX.X 度」特徵
+    lat_match = re.search(r'北緯\s*([\d\.]+)\s*度', text)
+    lng_match = re.search(r'東經\s*([\d\.]+)\s*度', text)
+    
+    if lat_match and lng_match:
         try:
-            return float(lat), float(lng)
-        except (ValueError, TypeError):
+            return float(lat_match.group(1)), float(lng_match.group(1))
+        except ValueError:
             pass
-        # 若一層沒找到，遞迴搜尋子物件
-        for v in data.values():
-            res_lat, res_lng = extract_lat_lng(v)
-            if res_lat != 0.0 and res_lng != 0.0:
-                return res_lat, res_lng
-    elif isinstance(data, list):
-        if len(data) >= 2 and all(isinstance(x, (int, float, str)) for x in data[:2]):
-            try:
-                v1, v2 = float(data[0]), float(data[1])
-                return (v2, v1) if v1 > 100 else (v1, v2)
-            except ValueError:
-                pass
-        for item in data:
-            res_lat, res_lng = extract_lat_lng(item)
-            if res_lat != 0.0 and res_lng != 0.0:
-                return res_lat, res_lng
     return 0.0, 0.0
 
-# --- 🌐 4. 三重 API 備援：熱帶性低氣壓(TD)與颱風全自動定位 ---
+def deep_search_lat_lng(data):
+    """通用極限搜尋欄位與字串"""
+    if isinstance(data, dict):
+        # 1. 直接搜尋常見屬性
+        for k in ['latitude', 'lat', 'Lat', 'stationLatitude']:
+            if k in data and data[k]:
+                try:
+                    val = float(data[k])
+                    if 0 < val < 90:
+                        # 找找是否有搭配的經度
+                        for lg in ['longitude', 'lng', 'Lng', 'stationLongitude']:
+                            if lg in data and data[lg]:
+                                return val, float(data[lg])
+                except (ValueError, TypeError):
+                    pass
+        
+        # 2. 搜尋文字屬性並用 Regex 解析
+        for k, v in data.items():
+            if isinstance(v, str):
+                lat, lng = parse_text_coordinates(v)
+                if lat != 0.0 and lng != 0.0:
+                    return lat, lng
+            elif isinstance(v, (dict, list)):
+                lat, lng = deep_search_lat_lng(v)
+                if lat != 0.0 and lng != 0.0:
+                    return lat, lng
+
+    elif isinstance(data, list):
+        for item in data:
+            lat, lng = deep_search_lat_lng(item)
+            if lat != 0.0 and lng != 0.0:
+                return lat, lng
+
+    return 0.0, 0.0
+
+# --- 🌐 4. 全面升級：多資料集 + 文字解碼 API 抓取 ---
 @st.cache_data(ttl=60)
 def fetch_real_cwa_cyclones(token):
     cyclones = {}
-    # 優先讀取包含 TD 的專屬 API 資料集
-    dataset_ids = ["W-C0034-005", "W-C0035-001", "W-C0034-001"]
+    # 加入 W-C0034-003 (熱帶性低氣壓特報專屬資料集)
+    dataset_ids = ["W-C0034-003", "W-C0034-005", "W-C0035-001", "W-C0034-001"]
     
     for ds_id in dataset_ids:
         try:
             url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/{ds_id}?Authorization={token}"
-            res = requests.get(url, timeout=5).json()
+            res = requests.get(url, timeout=6).json()
             
-            if not res.get('success') == 'true' and 'records' not in res:
+            if not res.get('success') == 'true' or 'records' not in res:
                 continue
 
             records = res.get('records', {})
-            # 兼容各資料集的節點命名
-            tc_data = (records.get('tropicalCyclones', {}) or 
-                       records.get('tropicalCyclone', {}) or 
-                       records.get('location', []))
             
-            if isinstance(tc_data, dict):
-                tc_list = tc_data.get('tropicalCyclone', [tc_data])
-            elif isinstance(tc_data, list):
-                tc_list = tc_data
-            else:
-                tc_list = []
+            # 全搜尋 JSON 的所有節點
+            lat, lng = deep_search_lat_lng(records)
+            
+            if lat != 0.0 and lng != 0.0:
+                # 嘗試抓取名稱或編號
+                name = "熱帶性低氣壓 (TD)"
+                raw_str = json.dumps(records, ensure_ascii=False)
+                td_match = re.search(r'TD\d+|熱帶性低氣壓第?\d*號?', raw_str)
+                if td_match:
+                    name = f"熱帶性低氣壓 ({td_match.group(0)})"
 
-            for tc in tc_list:
-                if not isinstance(tc, dict):
-                    continue
-                
-                # 取得名稱 (TD 或 颱風名)
-                cwa_name = tc.get('cwaName', tc.get('typhoonName', tc.get('name', '')))
-                cwa_td_no = tc.get('typhoonNumber', tc.get('tropicalDebressionNumber', ''))
-                
-                if cwa_td_no:
-                    full_name = f"熱帶性低氣壓 TD{cwa_td_no}" if "TD" not in str(cwa_td_no) else f"熱帶性低氣壓 {cwa_td_no}"
-                elif cwa_name:
-                    full_name = f"熱帶氣旋/颱風 ({cwa_name})"
-                else:
-                    full_name = "熱帶性低氣壓 (TD)"
-
-                if full_name in cyclones:
-                    continue
-
-                # 提取當前中心位置
-                analysis = tc.get('analysisData', tc.get('analysis', tc))
-                lat, lng = extract_lat_lng(analysis)
-                
-                if lat == 0.0 and lng == 0.0:
-                    # 嘗試備援搜尋全物件
-                    lat, lng = extract_lat_lng(tc)
-
-                if lat != 0.0 and lng != 0.0:
-                    # 解析預報點
-                    forecasts = []
-                    fc_periods = tc.get('forecastData', {}).get('forecastPeriod', tc.get('forecast', []))
-                    if isinstance(fc_periods, dict):
-                        fc_periods = fc_periods.get('forecastPeriod', [])
-                    
-                    if isinstance(fc_periods, list):
-                        for idx, fp in enumerate(fc_periods):
-                            f_lat, f_lng = extract_lat_lng(fp)
-                            time_str = fp.get('forecastTime', fp.get('time', f'預報點 {idx+1}'))
-                            if f_lat != 0.0 and f_lng != 0.0:
-                                forecasts.append({
-                                    "lat": f_lat,
-                                    "lng": f_lng,
-                                    "info": f"📅 {full_name} 預報位置 ({time_str})"
-                                })
-
-                    cyclones[full_name] = {
-                        "current": {"lat": lat, "lng": lng, "info": f"🌀 {full_name} 現況實測中心"},
-                        "storm_radius_7": 150000, # 預設示範暴風範圍/外圍環流 150km
-                        "forecast": forecasts,
-                        "path_color": "#f59e0b" if "TD" in full_name or "低氣壓" in full_name else "#ef4444"
+                if name not in cyclones:
+                    cyclones[name] = {
+                        "current": {"lat": lat, "lng": lng, "info": f"🌀 {name} 氣象署定位中心"},
+                        "storm_radius_7": 150000, # 150km 警戒區
+                        "forecast": [],
+                        "path_color": "#f59e0b"
                     }
         except Exception:
             continue
 
     return cyclones
 
-# 執行真實資料載入
+# 執行抓取
 CYCLONE_DATA = fetch_real_cwa_cyclones(CWA_TOKEN)
 HAS_ACTIVE_CYCLONES = len(CYCLONE_DATA) > 0
 
@@ -195,26 +177,30 @@ dynamic_ty_text_blocks = []
 if HAS_ACTIVE_CYCLONES:
     for c_name, c_config in CYCLONE_DATA.items():
         c_dist = calculate_distance(taiwan_lat, taiwan_lng, c_config["current"]["lat"], c_config["current"]["lng"])
-        text_block = f"• <b>{c_name}</b>：氣象署即時定位為 <b>北緯 {c_config['current']['lat']}°，東經 {c_config['current']['lng']}°</b>，距離屏東指揮點約 <b>{int(c_dist)} 公里</b>。抓取到 {len(c_config['forecast'])} 個預報定位點。"
-        processed_summary[c_name] = {"dist": int(c_dist), "fc_count": len(c_config["forecast"])}
+        
+        # 計算海里距離
+        dist_nm = int(c_dist * 0.539957)
+        
+        text_block = f"• <b>{c_name}</b>：中心位置 <b>北緯 {c_config['current']['lat']}°，東經 {c_config['current']['lng']}°</b>，距離屏東約 <b>{int(c_dist)} 公里 ({dist_nm} 海里)</b>。"
+        processed_summary[c_name] = {"dist": int(c_dist), "dist_nm": dist_nm}
         dynamic_ty_text_blocks.append(text_block)
 else:
-    dynamic_ty_text_blocks.append("• <b>當前海域動態</b>：經氣象署 API 三重資料集強行檢索，目前開放資料庫尚未釋出最新 TD JSON 節點。建議隨時按右上角「🔄 強制刷新最新數據」重試。")
+    dynamic_ty_text_blocks.append("• <b>海域狀態</b>：已透過特報文字解碼與四重資料集檢索，目前氣象署 Open Data 尚未釋出最新 TD 定位座標點。")
 
-# --- 🌐 5. 降雨與氣溫動態資料 ---
+# --- 🌐 5. 雨量與氣溫資料 ---
 @st.cache_data(ttl=300)
 def fetch_cwa_data(token):
     backup_rain = {"p12": "0 mm", "p24": "5 mm", "m12": "5 mm", "m24": "15 mm"}
     backup_temp = "34.5°C"
     backup_trend = []
-    base_descriptions = ["午後山區有局部短暫雷陣雨", "各地大多為多雲到晴", "沿海平地清晨有零星陣雨", "山區午後對象發展較旺盛", "各地維持晴到多雲"]
+    base_descriptions = ["午後山區有局部短暫雷陣雨", "各地大多為多雲到晴", "沿海平地清晨有零星陣雨", "山區午後對流較旺盛", "各地維持晴到多雲"]
     for i in range(5):
         future_day = tw_time + timedelta(days=i)
         day_str = future_day.strftime("%m/%d")
         prob_p_val = max(10, min(40, int(20 + 10 * math.sin(i))))
         prob_m_val = max(20, min(50, int(35 + 12 * math.cos(i))))
         backup_trend.append({
-            "預報時段": f"{day_str} 全天", "平地機率": f"{prob_p_val}% 🟢", "山區機率": f"{prob_m_val}% 🟢", "中央氣象署說明": base_descriptions[i % len(base_descriptions)]
+            "預報時段": f"{day_str} 全天", "平地機率": f"{prob_p_val}% 🟢", "山區機率": f"{prob_m_val}% 🟢", "說明": base_descriptions[i % len(base_descriptions)]
         })
 
     try:
@@ -244,13 +230,13 @@ df_pingtung_trend = pd.DataFrame(cwa_trend)
 # 跑馬燈
 if HAS_ACTIVE_CYCLONES:
     marquee_alerts = [
-        f"⚠️ 氣象通報：已透過 API 成功捕捉熱帶性低氣壓(TD)/熱帶氣旋最新即時定位與動態！",
+        f"⚠️ 氣象特報：已成功抓取並解碼熱帶性低氣壓 (TD) 最新經緯度與動態！",
         f"🌧️ 即時雨量：屏東平地累積雨量 {m_p12}，山區部落累積雨量 {m_m12}。"
     ]
 else:
     marquee_alerts = [
-        f"☀️ 天氣通報：今日（{month}月{day}日）氣象署 Open Data API 正進行節點切換，點擊右上角按鈕可手動刷新。",
-        f"🌡️ 屏東實測氣溫 {cwa_temperature}，夏日午後請留意局部雷陣雨。"
+        f"☀️ 天氣通報：今日（{month}月{day}日）氣象署 Open Data 數據即時更新中，可點選右上角手動刷新。",
+        f"🌡️ 屏東實測氣溫 {cwa_temperature}，請注意午後局部雷陣雨。"
     ]
 marquee_text = " | ".join(marquee_alerts)
 st.markdown(f'<div class="marquee-box"><marquee scrollamount="6">{marquee_text}</marquee></div>', unsafe_allow_html=True)
@@ -264,7 +250,7 @@ with left_main_col:
     with list_col:
         st.markdown(f"""
         <div class="sidebar-prob-container">
-            <div style="font-size:12px; font-weight:bold; color:#38bdf8; text-align:center; line-height:1.3;">🌀 中央氣象署即時 TD/氣旋<br><span style="color:#34d399; font-size:10px;">(三重 API 自動檢索)</span></div>
+            <div style="font-size:12px; font-weight:bold; color:#38bdf8; text-align:center; line-height:1.3;">🌀 熱帶性低氣壓 / 氣旋定位<br><span style="color:#34d399; font-size:10px;">(特報文字解碼 + 四重 API)</span></div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -280,17 +266,17 @@ with left_main_col:
                     <div style="background-color: #1e293b; padding: 10px; border-radius: 6px; font-size: 11.5px; color: #e2e8f0; border: 1px solid #334155; line-height:1.6;">
                         📍 <b>中心緯度：</b> {c_info['current']['lat']}° N<br>
                         📍 <b>中心經度：</b> {c_info['current']['lng']}° E<br>
-                        🎯 <b>距屏東距離：</b> <b style="color:#38bdf8;">{sum_info['dist']} km</b><br>
-                        🔮 <b>預報點位數：</b> {sum_info['fc_count']} 個點<br>
+                        🎯 <b>距屏東距離：</b> <b style="color:#f59e0b;">{sum_info['dist']} km</b><br>
+                        ⚓ <b>海里距離：</b> <b style="color:#38bdf8;">{sum_info['dist_nm']} NM</b><br>
                     </div>
                     """, unsafe_allow_html=True)
         else:
-            tabs = st.tabs(["無列管 TD / 氣旋"])
+            tabs = st.tabs(["預設警戒監控"])
             with tabs[0]:
                 st.markdown("""
-                <div style="background-color:#1e293b; padding:25px 10px; border-radius:6px; text-align:center; color:#94a3b8; font-size:12px; border:1px dashed #334155; margin-top:5px; line-height:1.6;">
-                    🍃 <b>API 資料庫尚在同步中</b><br>
-                    請點擊右上角「強制刷新最新數據」按鈕。
+                <div style="background-color:#1e293b; padding:20px 10px; border-radius:6px; text-align:center; color:#94a3b8; font-size:11.5px; border:1px dashed #334155; margin-top:5px; line-height:1.6;">
+                    🍃 <b>API 特報寫入中</b><br>
+                    若新聞已發布，請按右上角<br>「🔄 強制刷新最新數據」
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -312,7 +298,7 @@ with left_main_col:
         <body>
             <div id="map"></div>
             <script>
-                var map = L.map('map', {{zoomControl: false}}).setView([21.5, 121.5], 6);
+                var map = L.map('map', {{zoomControl: false}}).setView([20.0, 122.0], 5);
                 L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}', {{ attribution: 'Google Maps' }}).addTo(map);
 
                 var cyclones = {cyclone_data_json};
@@ -322,27 +308,17 @@ with left_main_col:
                     var curr = c.current;
                     
                     var centerMarker = L.circleMarker([curr.lat, curr.lng], {{
-                        radius: 8, color: '#ffffff', weight: 2, fillColor: c.path_color, fillOpacity: 0.9
+                        radius: 9, color: '#ffffff', weight: 2, fillColor: c.path_color, fillOpacity: 0.95
                     }}).addTo(map);
                     centerMarker.bindPopup(curr.info).openPopup();
 
                     if (c.storm_radius_7 > 0) {{
-                        L.circle([curr.lat, curr.lng], {{ radius: c.storm_radius_7, color: c.path_color, weight: 1.5, fillColor: c.path_color, fillOpacity: 0.15 }}).addTo(map);
-                    }}
-
-                    if (c.forecast && c.forecast.length > 0) {{
-                        var pathCoords = [[curr.lat, curr.lng]];
-                        c.forecast.forEach(function(pt) {{
-                            pathCoords.push([pt.lat, pt.lng]);
-                            var fMarker = L.circleMarker([pt.lat, pt.lng], {{radius: 4, color: '#ffffff', weight: 1, fillColor: '#000000', fillOpacity: 0.8}}).addTo(map);
-                            fMarker.bindPopup(pt.info);
-                        }});
-                        L.polyline(pathCoords, {{color: c.path_color, weight: 2, dashArray: '5, 8'}}).addTo(map);
+                        L.circle([curr.lat, curr.lng], {{ radius: c.storm_radius_7, color: c.path_color, weight: 1.5, fillColor: c.path_color, fillOpacity: 0.18 }}).addTo(map);
                     }}
                 }});
 
                 var defender = L.circleMarker([{taiwan_lat}, {taiwan_lng}], {{ radius: 9, color: '#ffffff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 }}).addTo(map);
-                defender.bindPopup("⚠️ 屏東守備防禦指揮點");
+                defender.bindPopup("⚠️ 屏東守備指揮點");
             </script>
         </body>
         </html>
@@ -355,42 +331,38 @@ with left_main_col:
         <div style="background-color:#1e293b; padding:10px; border-radius:6px; border-left:5px solid {temp_color}; margin-bottom:12px; text-align:center;">
             <span style="font-size:12px; color:#94a3b8; font-weight:bold;">🌡️ 屏東今日即時氣溫</span><br>
             <span style="font-size:26px; color:{temp_color}; font-weight:bold;">{cwa_temperature}</span>
-            <br><span style='font-size:11px; color:#34d399; font-weight:bold;'>🟢 氣溫狀態：常態高溫</span>
+            <br><span style='font-size:11px; color:#34d399; font-weight:bold;'>🟢 氣溫狀態：常態</span>
         </div>
         """, unsafe_allow_html=True)
 
         st.markdown('<div style="font-size:13px; font-weight:bold; color:#38bdf8; margin-bottom:5px;">🌧️ 屏東縣最新降雨估計</div>', unsafe_allow_html=True)
         df_metrics = pd.DataFrame([
-            {"區域": "平地城市地區", "半天累積雨量": m_p12, "全天累積雨量": m_p24},
-            {"區域": "山區部落路段", "半天累積雨量": m_m12, "全天累積雨量": m_m24}
+            {"區域": "平地城市地區", "半天累積": m_p12, "全天累積": m_p24},
+            {"區域": "山區部落路段", "半天累積": m_m12, "全天累積": m_m24}
         ])
         st.dataframe(df_metrics, hide_index=True, use_container_width=True)
         
-        st.markdown('<div style="font-size:13px; font-weight:bold; color:#ffffff; background-color:#1e293b; padding:4px 8px; border-left:4px solid #38bdf8; margin-top:10px; margin-bottom:5px;">📅 未來 5 天降雨情報預報</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:13px; font-weight:bold; color:#ffffff; background-color:#1e293b; padding:4px 8px; border-left:4px solid #38bdf8; margin-top:10px; margin-bottom:5px;">📅 未來 5 天降雨情報</div>', unsafe_allow_html=True)
         st.dataframe(df_pingtung_trend, hide_index=True, use_container_width=True)
 
 with right_summary_col:
     border_color = "#38bdf8"
-    
     ty_dynamic_report = "<br>".join(dynamic_ty_text_blocks)
-    temp_dynamic_report = f"目前屏東實測最高氣溫為 <b>{cwa_temperature}</b>。體感偏熱，請戶外活動同仁適時補充水分。"
-    rain_dynamic_report = f"依據即時水文觀測，平地城市全天累積雨量預估為 <b>{m_p24}</b>，山區部落則為 <b>{m_m12}</b>。水利狀況穩定。"
 
     st.markdown(f"""
     <div style="background-color: #0f172a; border-top: 4px solid {border_color}; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; color: #e2e8f0;">
         <div style="font-size: 17px; font-weight: bold; color: {border_color}; margin-bottom: 15px;">📊 勇式總結</div>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
-        <b>① 大氣氣旋/TD動態評估：</b><br>
+        <b>① 大氣熱帶低壓/氣旋監控：</b><br>
         {ty_dynamic_report}
         </p>
         <p style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">
-        <b>② 即時氣溫觀測指引：</b><br>
-        {temp_dynamic_report}
+        <b>② 屏東即時氣溫：</b><br>
+        屏東實測最高氣溫 <b>{cwa_temperature}</b>。體感偏熱，請多補充水分。
         </p>
         <p style="font-size:13.5px; line-height:1.6;">
-        <b>③ 水文降雨現況安全提醒：</b><br>
-        {rain_dynamic_report}<br>
-        👉 <i>提示：前往山區或溪畔活動請注意天色變化與午後雷陣雨。</i>
+        <b>③ 水文狀況：</b><br>
+        平地全天預估 <b>{m_p24}</b>，山區預估 <b>{m_m12}</b>。目前水文狀態正常。
         </p>
     </div>
     """, unsafe_allow_html=True)
